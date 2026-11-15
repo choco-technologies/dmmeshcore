@@ -3,3 +3,4 @@ $include https://github.com/choco-technologies/dmmeshcore/releases/download/vlat
 
 # Module entry with version placeholder - expanded by $version-available
 dmmeshcore https://github.com/choco-technologies/dmmeshcore/releases/download/v<version>/dmmeshcore-v<version>-<arch_name>.zip
+meshcore https://github.com/choco-technologies/dmmeshcore/releases/download/v<version>/meshcore-v<version>-<arch_name>.zip
