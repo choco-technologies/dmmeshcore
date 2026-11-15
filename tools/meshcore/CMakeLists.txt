@@ -1,0 +1,8 @@
+set(DMOD_MODULE_NAME meshcore)
+set(DMOD_MODULE_VERSION ${PROJECT_VERSION})
+set(DMOD_AUTHOR_NAME "Patryk Kubiak")
+set(DMOD_STACK_SIZE 6144)
+set(DMOD_DMR_PATH ${CMAKE_CURRENT_SOURCE_DIR}/meshcore.dmr)
+dmod_add_executable(meshcore ${DMOD_MODULE_VERSION} meshcore.c)
+target_link_libraries(meshcore dmmeshcore_if)
+dmod_link_modules(meshcore dmdrvi@>=2.17)

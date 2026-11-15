@@ -74,7 +74,8 @@ set(DMOD_DIF_IMPLS          )
 #
 dmod_add_library(${DMOD_MODULE_NAME} ${DMOD_MODULE_VERSION}
     # List of source files - can include C and C++ files
-    src/dmmeshcore.c
+    src/packet.c
+    src/group.c
 )
 
 target_include_directories(${DMOD_MODULE_NAME} PRIVATE
@@ -85,9 +86,10 @@ target_include_directories(${DMOD_MODULE_NAME}_if INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-# To depend on another module's headers, use:
-#   dmod_link_modules(${DMOD_MODULE_NAME}
-#       other_module@1.0
-#   )
+# dmcrypto: the hash, the HMAC and AES of the group channels. No versions: the latest is taken.
+dmod_link_modules(${DMOD_MODULE_NAME}
+    dmcrypto
+)
 enable_testing()
 add_subdirectory(tests)
+add_subdirectory(tools/meshcore)
