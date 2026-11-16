@@ -49,6 +49,8 @@ static struct
 {
     dmosi_mutex_t           lock;
     bool                    started;            /* a radio is served */
+    bool                    channels_loaded;    /* the file of the channels was read (or written): until then it is not written over */
+    uint32_t                channels_tried_ms;  /* when it was tried last (the file system may come up after the service) */
     char                    unit[48];
     char                    path[PATH_MAX_LENGTH + 1];
     char                    radio[24];
@@ -251,6 +253,8 @@ static void take_frame(const dmdrvi_lora_frame_t* frame)
 
 /* ---- The worker ---- */
 
+static void ensure_channels_loaded_locked(void);
+
 static void worker_main(void* arg)
 {
     (void)arg;
@@ -260,6 +264,8 @@ static void worker_main(void* arg)
     {
         dmosi_mutex_lock(g.lock);
         bool serving = g.started;
+        if (serving)
+            ensure_channels_loaded_locked();
         bool enabled = g.settings.enabled && serving;
         libmeshcore_settings_t settings = g.settings;
         char path[PATH_MAX_LENGTH + 1];
@@ -570,7 +576,8 @@ static void save_channels(void)
     }
     dmosi_mutex_unlock(g.lock);
     dmini_set_int(ini, "channels", "count", (int)n);
-    (void)dmini_generate_file(ini, LIBMESHCORE_CHANNELS_FILE);
+    if (dmini_generate_file(ini, LIBMESHCORE_CHANNELS_FILE) == 0)
+        g.channels_loaded = true;
     dmini_destroy(ini);
 }
 
@@ -582,6 +589,7 @@ static void load_channels_locked(void)
         return;
     if (dmini_parse_file(ini, LIBMESHCORE_CHANNELS_FILE) == 0 && dmini_has_section(ini, "channels"))
     {
+        g.channels_loaded = true;
         int count = dmini_get_int(ini, "channels", "count", 0);
         for (int i = 0; i < count && i < (int)LIBMESHCORE_MAX_CHANNELS; i++)
         {
@@ -598,6 +606,17 @@ static void load_channels_locked(void)
     dmini_destroy(ini);
 }
 
+/* The service may start before the file system of /ext is there: the file is read at the first use after it is (every 2 s at most), and what is
+ * written before it was read would take the channels of the file away - so a channel that is added meanwhile waits for it */
+static void ensure_channels_loaded_locked(void)
+{
+    uint32_t now = Dmod_GetUptime();
+    if (g.channels_loaded || (g.channels_tried_ms != 0u && now - g.channels_tried_ms < 2000u))
+        return;
+    g.channels_tried_ms = now != 0u ? now : 1u;
+    load_channels_locked();
+}
+
 dmod_libmeshcore_api_declaration(1.0, int, _channel_add, ( const char* name, const char* secret ))
 {
     if (name == NULL || name[0] == '\0' || g.lock == NULL)
@@ -609,6 +628,7 @@ dmod_libmeshcore_api_declaration(1.0, int, _channel_add, ( const char* name, con
     if (ret != 0)
         return ret;
     dmosi_mutex_lock(g.lock);
+    ensure_channels_loaded_locked();
     ret = add_channel_locked(name, &channel);
     dmosi_mutex_unlock(g.lock);
     if (ret == 0)
@@ -621,6 +641,7 @@ dmod_libmeshcore_api_declaration(1.0, int, _channel_remove, ( uint8_t index ))
     if (index == 0 || index >= LIBMESHCORE_MAX_CHANNELS || g.lock == NULL)
         return -EINVAL;
     dmosi_mutex_lock(g.lock);
+    ensure_channels_loaded_locked();
     int ret = g.channels[index].used ? 0 : -ENOENT;
     if (ret == 0)
     {
@@ -639,6 +660,7 @@ dmod_libmeshcore_api_declaration(1.0, int, _channel_name, ( uint8_t index, char*
         return -EINVAL;
     int ret = -ENOENT;
     dmosi_mutex_lock(g.lock);
+    ensure_channels_loaded_locked();
     if (index < LIBMESHCORE_MAX_CHANNELS && g.channels[index].used)
     {
         Dmod_SnPrintf(name, capacity, "%s", g.channels[index].name);
