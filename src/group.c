@@ -65,6 +65,16 @@ dmod_libmeshcore_api_declaration(1.0, int, _channel_from_text, ( libmeshcore_cha
         return -EINVAL;
     size_t length = strlen(text);
     uint8_t secret[LIBMESHCORE_CHANNEL_KEY_SIZE];
+    if (text[0] == '#' && length > 1u)
+    {
+        /* A channel of a name ("#test"): the key is the first 16 bytes of SHA-256 of the name (with the #), so everybody who knows the name has it */
+        uint8_t digest[32];
+        size_t size = 0;
+        if (dmcrypto_hash(DMCRYPTO_HASH_SHA256, (const uint8_t*)text, length, digest, sizeof(digest), &size) != DMCRYPTO_OK || size < sizeof(secret))
+            return -EIO;
+        memcpy(secret, digest, sizeof(secret));
+        return libmeshcore_channel_init(channel, secret);
+    }
     if (length == 2u * LIBMESHCORE_CHANNEL_KEY_SIZE)
     {
         for (size_t i = 0; i < LIBMESHCORE_CHANNEL_KEY_SIZE; i++)

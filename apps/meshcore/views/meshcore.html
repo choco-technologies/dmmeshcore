@@ -28,12 +28,24 @@ body { font-size: 14px; line-height: 1.2; }
 .row:active { background: #000; color: #fff; }
 
 /* the texts of the rows are at the left (the converter centers a text that is set later when the alignment is not said) */
-.item .nm, .item .sub, .msg .who, .msg .l1, .msg .l2, #st-title, #st-line1, #st-line2, #st-line3 { text-align: left; }
+.item .nm, .item .sub, #st-title, #st-line1, #st-line2, #st-line3 { text-align: left; }
 
 /* a text to write */
 #cp-to { position: absolute; left: 12px; top: 38px; width: 216px; font-size: 14px; font-weight: 700; }
 #cp-field { position: absolute; left: 10px; top: 60px; width: 220px; height: 112px; border: 2px solid #000; border-radius: 6px; overflow: hidden; }
-#cp-text { position: absolute; left: 6px; top: 5px; width: 204px; font-size: 14px; line-height: 17px; white-space: normal; word-wrap: break-word; text-align: left; }
+#cp-field .cl { position: absolute; left: 6px; width: 196px; height: 17px; font-size: 14px; white-space: nowrap; overflow: hidden; text-align: left; }
+#cp-l0 { top: 4px; } #cp-l1 { top: 21px; } #cp-l2 { top: 38px; } #cp-l3 { top: 55px; } #cp-l4 { top: 72px; } #cp-l5 { top: 89px; } 
+#ad-l1, #ad-l2 { position: absolute; left: 12px; width: 208px; font-size: 14px; font-weight: 700; text-align: left; }
+#ad-l1 { top: 38px; } #ad-l2 { top: 100px; }
+.adf { position: absolute; left: 10px; width: 220px; height: 30px; border: 2px solid #000; border-radius: 6px; overflow: hidden; }
+#ad-f1 { top: 58px; } #ad-f2 { top: 120px; }
+.adf .at { position: absolute; left: 6px; top: 4px; width: 196px; height: 20px; font-size: 14px; white-space: nowrap; overflow: hidden; text-align: left; }
+#ad-hint { position: absolute; left: 12px; top: 160px; width: 208px; font-size: 12px; text-align: left; }
+#ad-status { position: absolute; left: 12px; top: 186px; width: 208px; font-size: 13px; font-weight: 700; text-align: left; }
+#ad-go { left: 70px; top: 224px; width: 100px; height: 34px; line-height: 30px; background: #000; color: #fff; }
+#ad-go:active { background: #fff; color: #000; }
+.zone { position: absolute; }
+
 #cp-hint { position: absolute; left: 12px; top: 178px; width: 216px; font-size: 12px; text-align: left; }
 #cp-status { position: absolute; left: 12px; top: 196px; width: 216px; font-size: 13px; font-weight: 700; text-align: left; }
 #cp-send { left: 70px; top: 224px; width: 100px; height: 34px; line-height: 30px; background: #000; color: #fff; }
@@ -50,17 +62,43 @@ body { font-size: 14px; line-height: 1.2; }
 
 /* the lists */
 .item { height: 40px; }
-.item .nm { position: absolute; left: 12px; top: 3px; width: 216px; font-size: 16px; font-weight: 700; }
-.item .sub { position: absolute; left: 12px; top: 22px; width: 216px; font-size: 12px; }
-#n0 { top:36px; } #n1 { top:76px; } #n2 { top:116px; } #n3 { top:156px; } #n4 { top:196px; } 
-.msg { height: 48px; }
-.msg .who { position: absolute; left: 12px; top: 1px; width: 216px; font-size: 12px; font-weight: 700; }
-.msg .l1 { position: absolute; left: 12px; top: 15px; width: 216px; font-size: 13px; }
-.msg .l2 { position: absolute; left: 12px; top: 30px; width: 216px; font-size: 13px; }
-#t0 { top:36px; } #t1 { top:84px; } #t2 { top:132px; } #t3 { top:180px; } 
+.item .nm { position: absolute; left: 12px; top: 3px; width: 208px; font-size: 16px; font-weight: 700; }
+.item .sub { position: absolute; left: 12px; top: 22px; width: 208px; font-size: 12px; }
+#n0, #c0 { top:36px; } #n1, #c1 { top:76px; } #n2, #c2 { top:116px; } #n3, #c3 { top:156px; } #n4, #c4 { top:196px; }
 .info { position: absolute; left: 60px; top: 248px; width: 120px; text-align: center; font-size: 12px; }
 .pg { top: 242px; width: 52px; height: 28px; line-height: 24px; font-size: 16px; }
-#prev-n, #prev-t { left: 6px; } #next-n, #next-t { left: 182px; }
+#prev-n, #prev-c { left: 6px; } #next-n, #next-c { left: 182px; }
+
+/* the chat: lines of 16 px, a bubble is a head line (who, when, hops) and the lines of its text; the text of the user is at the right, in black */
+.bb { position: absolute; width: 190px; overflow: hidden; }
+.bb.top { height: 13px; }
+.bb.mid { height: 16px; }
+.bb.bot { height: 16px; }
+/* the rounded ends: a rounded box taller than the line, cut by the line (the converter has one radius for all the corners of a box) */
+.bb .sh { position: absolute; left: 0; width: 190px; height: 24px; border-radius: 8px; }
+.bb.top .sh { top: 0; } .bb.bot .sh { top: -8px; }
+.bb.t { width: 190px; }
+.bb.t .sh { border: 2px solid #000; }
+.bb.t.mid { border-left: 2px solid #000; border-right: 2px solid #000; width: 190px; }
+.bb.m .sh { background: #000; }
+.bb.m { color: #fff; }
+.bb.m.mid { background: #000; }
+.bb .bt { position: absolute; left: 8px; width: 160px; height: 15px; font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-align: left; }
+.bb.top .bt { top: 1px; font-size: 10px; height: 11px; }
+.bb.t.mid .bt { left: 6px; }
+.bb.mid .bt, .bb.bot .bt { top: 0; }
+#chat-name { position: absolute; left: 40px; top: 5px; width: 120px; font-size: 18px; font-weight: 700; text-align: left; }
+.hdr .up, .hdr .dn { position: absolute; top: 2px; width: 34px; height: 26px; border: 2px solid #000; border-radius: 6px; text-align: center; font-size: 16px; font-weight: 700; line-height: 22px; }
+.hdr .up { left: 166px; } .hdr .dn { left: 204px; }
+#in-rule { position: absolute; left: 0; top: 226px; width: 240px; height: 2px; background: #000; }
+#in-field { position: absolute; left: 8px; top: 231px; width: 160px; height: 40px; border: 2px solid #000; border-radius: 8px; overflow: hidden; }
+#in-l1, #in-l2 { position: absolute; left: 6px; width: 130px; height: 16px; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-align: left; }
+#in-l1 { top: 2px; } #in-l2 { top: 19px; }
+#in-edit { position: absolute; left: 172px; top: 231px; width: 28px; height: 40px; border: 2px solid #000; border-radius: 8px; text-align: center; font-size: 13px; font-weight: 700; line-height: 36px; }
+#in-send { position: absolute; left: 204px; top: 231px; width: 28px; height: 40px; border: 2px solid #000; border-radius: 8px; background: #000; color: #fff; text-align: center; font-size: 16px; font-weight: 700; line-height: 36px; }
+#in-edit:active { background: #000; color: #fff; } #in-send:active { background: #fff; color: #000; }
+.hdr .new { position: absolute; right: 0; top: 0; width: 44px; height: 30px; font-size: 24px; font-weight: 700; text-align: center; line-height: 26px; }
+.hit { position: absolute; left: 0; width: 240px; height: 16px; }
 </style>
 </head>
 <body>
@@ -86,22 +124,158 @@ body { font-size: 14px; line-height: 1.2; }
   <div class="btn pg" id="prev-n">&lt;</div><div class="info nowrap" id="nodes-info">1-5 of 9</div><div class="btn pg" id="next-n">&gt;</div>
 </div>
 
-<div class="page" id="texts">
-  <div class="hdr"><div class="back" id="texts-back">&lt;</div><div class="name">Messages</div><div class="new" id="texts-new">+</div><div class="rule"></div></div>
-  <div class="row msg" id="t0"><div class="who nowrap" id="t0-who">Public</div><div class="l1 nowrap" id="t0-l1">text</div><div class="l2 nowrap" id="t0-l2">text</div></div>
-  <div class="row msg" id="t1"><div class="who nowrap" id="t1-who">Public</div><div class="l1 nowrap" id="t1-l1">text</div><div class="l2 nowrap" id="t1-l2">text</div></div>
-  <div class="row msg" id="t2"><div class="who nowrap" id="t2-who">Public</div><div class="l1 nowrap" id="t2-l1">text</div><div class="l2 nowrap" id="t2-l2">text</div></div>
-  <div class="row msg" id="t3"><div class="who nowrap" id="t3-who">Public</div><div class="l1 nowrap" id="t3-l1">text</div><div class="l2 nowrap" id="t3-l2">text</div></div>
-  <div class="btn pg" id="prev-t">&lt;</div><div class="info nowrap" id="texts-info">1-4 of 7</div><div class="btn pg" id="next-t">&gt;</div>
+<div class="page" id="chats">
+  <div class="hdr"><div class="back" id="chats-back">&lt;</div><div class="name">Channels</div><div class="new" id="chats-new">+</div><div class="rule"></div></div>
+  <div class="row item" id="c0"><div class="nm nowrap" id="c0-name">Public</div><div class="sub nowrap" id="c0-sub">text</div></div>
+  <div class="row item" id="c1"><div class="nm nowrap" id="c1-name">Public</div><div class="sub nowrap" id="c1-sub">text</div></div>
+  <div class="row item" id="c2"><div class="nm nowrap" id="c2-name">Public</div><div class="sub nowrap" id="c2-sub">text</div></div>
+  <div class="row item" id="c3"><div class="nm nowrap" id="c3-name">Public</div><div class="sub nowrap" id="c3-sub">text</div></div>
+  <div class="row item" id="c4"><div class="nm nowrap" id="c4-name">Public</div><div class="sub nowrap" id="c4-sub">text</div></div>
+  <div class="btn pg" id="prev-c">&lt;</div><div class="info nowrap" id="chats-info">1-5 of 6</div><div class="btn pg" id="next-c">&gt;</div>
+</div>
+
+<div class="page" id="chat">
+  <div class="hdr"><div class="back" id="chat-back">&lt;</div><div id="chat-name" class="nowrap">Public</div><div class="up" id="chat-up">^</div><div class="dn" id="chat-dn">v</div><div class="rule"></div></div>
+  <div class="bb t top hidden" id="r0-1" style="left:8px;top:35px"><div class="bt" id="r0-1-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb t mid hidden" id="r0-2" style="left:8px;top:32px"><div class="bt" id="r0-2-t">&nbsp;</div></div>
+  <div class="bb t bot hidden" id="r0-3" style="left:8px;top:32px"><div class="bt" id="r0-3-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb m top hidden" id="r0-4" style="left:42px;top:35px"><div class="sh"></div><div class="bt" id="r0-4-t">&nbsp;</div></div>
+  <div class="bb m mid hidden" id="r0-5" style="left:42px;top:32px"><div class="bt" id="r0-5-t">&nbsp;</div></div>
+  <div class="bb m bot hidden" id="r0-6" style="left:42px;top:32px"><div class="sh"></div><div class="bt" id="r0-6-t">&nbsp;</div></div>
+  <div class="bb t top hidden" id="r1-1" style="left:8px;top:51px"><div class="bt" id="r1-1-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb t mid hidden" id="r1-2" style="left:8px;top:48px"><div class="bt" id="r1-2-t">&nbsp;</div></div>
+  <div class="bb t bot hidden" id="r1-3" style="left:8px;top:48px"><div class="bt" id="r1-3-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb m top hidden" id="r1-4" style="left:42px;top:51px"><div class="sh"></div><div class="bt" id="r1-4-t">&nbsp;</div></div>
+  <div class="bb m mid hidden" id="r1-5" style="left:42px;top:48px"><div class="bt" id="r1-5-t">&nbsp;</div></div>
+  <div class="bb m bot hidden" id="r1-6" style="left:42px;top:48px"><div class="sh"></div><div class="bt" id="r1-6-t">&nbsp;</div></div>
+  <div class="bb t top hidden" id="r2-1" style="left:8px;top:67px"><div class="bt" id="r2-1-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb t mid hidden" id="r2-2" style="left:8px;top:64px"><div class="bt" id="r2-2-t">&nbsp;</div></div>
+  <div class="bb t bot hidden" id="r2-3" style="left:8px;top:64px"><div class="bt" id="r2-3-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb m top hidden" id="r2-4" style="left:42px;top:67px"><div class="sh"></div><div class="bt" id="r2-4-t">&nbsp;</div></div>
+  <div class="bb m mid hidden" id="r2-5" style="left:42px;top:64px"><div class="bt" id="r2-5-t">&nbsp;</div></div>
+  <div class="bb m bot hidden" id="r2-6" style="left:42px;top:64px"><div class="sh"></div><div class="bt" id="r2-6-t">&nbsp;</div></div>
+  <div class="bb t top hidden" id="r3-1" style="left:8px;top:83px"><div class="bt" id="r3-1-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb t mid hidden" id="r3-2" style="left:8px;top:80px"><div class="bt" id="r3-2-t">&nbsp;</div></div>
+  <div class="bb t bot hidden" id="r3-3" style="left:8px;top:80px"><div class="bt" id="r3-3-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb m top hidden" id="r3-4" style="left:42px;top:83px"><div class="sh"></div><div class="bt" id="r3-4-t">&nbsp;</div></div>
+  <div class="bb m mid hidden" id="r3-5" style="left:42px;top:80px"><div class="bt" id="r3-5-t">&nbsp;</div></div>
+  <div class="bb m bot hidden" id="r3-6" style="left:42px;top:80px"><div class="sh"></div><div class="bt" id="r3-6-t">&nbsp;</div></div>
+  <div class="bb t top hidden" id="r4-1" style="left:8px;top:99px"><div class="bt" id="r4-1-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb t mid hidden" id="r4-2" style="left:8px;top:96px"><div class="bt" id="r4-2-t">&nbsp;</div></div>
+  <div class="bb t bot hidden" id="r4-3" style="left:8px;top:96px"><div class="bt" id="r4-3-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb m top hidden" id="r4-4" style="left:42px;top:99px"><div class="sh"></div><div class="bt" id="r4-4-t">&nbsp;</div></div>
+  <div class="bb m mid hidden" id="r4-5" style="left:42px;top:96px"><div class="bt" id="r4-5-t">&nbsp;</div></div>
+  <div class="bb m bot hidden" id="r4-6" style="left:42px;top:96px"><div class="sh"></div><div class="bt" id="r4-6-t">&nbsp;</div></div>
+  <div class="bb t top hidden" id="r5-1" style="left:8px;top:115px"><div class="bt" id="r5-1-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb t mid hidden" id="r5-2" style="left:8px;top:112px"><div class="bt" id="r5-2-t">&nbsp;</div></div>
+  <div class="bb t bot hidden" id="r5-3" style="left:8px;top:112px"><div class="bt" id="r5-3-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb m top hidden" id="r5-4" style="left:42px;top:115px"><div class="sh"></div><div class="bt" id="r5-4-t">&nbsp;</div></div>
+  <div class="bb m mid hidden" id="r5-5" style="left:42px;top:112px"><div class="bt" id="r5-5-t">&nbsp;</div></div>
+  <div class="bb m bot hidden" id="r5-6" style="left:42px;top:112px"><div class="sh"></div><div class="bt" id="r5-6-t">&nbsp;</div></div>
+  <div class="bb t top hidden" id="r6-1" style="left:8px;top:131px"><div class="bt" id="r6-1-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb t mid hidden" id="r6-2" style="left:8px;top:128px"><div class="bt" id="r6-2-t">&nbsp;</div></div>
+  <div class="bb t bot hidden" id="r6-3" style="left:8px;top:128px"><div class="bt" id="r6-3-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb m top hidden" id="r6-4" style="left:42px;top:131px"><div class="sh"></div><div class="bt" id="r6-4-t">&nbsp;</div></div>
+  <div class="bb m mid hidden" id="r6-5" style="left:42px;top:128px"><div class="bt" id="r6-5-t">&nbsp;</div></div>
+  <div class="bb m bot hidden" id="r6-6" style="left:42px;top:128px"><div class="sh"></div><div class="bt" id="r6-6-t">&nbsp;</div></div>
+  <div class="bb t top hidden" id="r7-1" style="left:8px;top:147px"><div class="bt" id="r7-1-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb t mid hidden" id="r7-2" style="left:8px;top:144px"><div class="bt" id="r7-2-t">&nbsp;</div></div>
+  <div class="bb t bot hidden" id="r7-3" style="left:8px;top:144px"><div class="bt" id="r7-3-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb m top hidden" id="r7-4" style="left:42px;top:147px"><div class="sh"></div><div class="bt" id="r7-4-t">&nbsp;</div></div>
+  <div class="bb m mid hidden" id="r7-5" style="left:42px;top:144px"><div class="bt" id="r7-5-t">&nbsp;</div></div>
+  <div class="bb m bot hidden" id="r7-6" style="left:42px;top:144px"><div class="sh"></div><div class="bt" id="r7-6-t">&nbsp;</div></div>
+  <div class="bb t top hidden" id="r8-1" style="left:8px;top:163px"><div class="bt" id="r8-1-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb t mid hidden" id="r8-2" style="left:8px;top:160px"><div class="bt" id="r8-2-t">&nbsp;</div></div>
+  <div class="bb t bot hidden" id="r8-3" style="left:8px;top:160px"><div class="bt" id="r8-3-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb m top hidden" id="r8-4" style="left:42px;top:163px"><div class="sh"></div><div class="bt" id="r8-4-t">&nbsp;</div></div>
+  <div class="bb m mid hidden" id="r8-5" style="left:42px;top:160px"><div class="bt" id="r8-5-t">&nbsp;</div></div>
+  <div class="bb m bot hidden" id="r8-6" style="left:42px;top:160px"><div class="sh"></div><div class="bt" id="r8-6-t">&nbsp;</div></div>
+  <div class="bb t top hidden" id="r9-1" style="left:8px;top:179px"><div class="bt" id="r9-1-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb t mid hidden" id="r9-2" style="left:8px;top:176px"><div class="bt" id="r9-2-t">&nbsp;</div></div>
+  <div class="bb t bot hidden" id="r9-3" style="left:8px;top:176px"><div class="bt" id="r9-3-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb m top hidden" id="r9-4" style="left:42px;top:179px"><div class="sh"></div><div class="bt" id="r9-4-t">&nbsp;</div></div>
+  <div class="bb m mid hidden" id="r9-5" style="left:42px;top:176px"><div class="bt" id="r9-5-t">&nbsp;</div></div>
+  <div class="bb m bot hidden" id="r9-6" style="left:42px;top:176px"><div class="sh"></div><div class="bt" id="r9-6-t">&nbsp;</div></div>
+  <div class="bb t top hidden" id="r10-1" style="left:8px;top:195px"><div class="bt" id="r10-1-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb t mid hidden" id="r10-2" style="left:8px;top:192px"><div class="bt" id="r10-2-t">&nbsp;</div></div>
+  <div class="bb t bot hidden" id="r10-3" style="left:8px;top:192px"><div class="bt" id="r10-3-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb m top hidden" id="r10-4" style="left:42px;top:195px"><div class="sh"></div><div class="bt" id="r10-4-t">&nbsp;</div></div>
+  <div class="bb m mid hidden" id="r10-5" style="left:42px;top:192px"><div class="bt" id="r10-5-t">&nbsp;</div></div>
+  <div class="bb m bot hidden" id="r10-6" style="left:42px;top:192px"><div class="sh"></div><div class="bt" id="r10-6-t">&nbsp;</div></div>
+  <div class="bb t top hidden" id="r11-1" style="left:8px;top:211px"><div class="bt" id="r11-1-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb t mid hidden" id="r11-2" style="left:8px;top:208px"><div class="bt" id="r11-2-t">&nbsp;</div></div>
+  <div class="bb t bot hidden" id="r11-3" style="left:8px;top:208px"><div class="bt" id="r11-3-t">&nbsp;</div><div class="sh"></div></div>
+  <div class="bb m top hidden" id="r11-4" style="left:42px;top:211px"><div class="sh"></div><div class="bt" id="r11-4-t">&nbsp;</div></div>
+  <div class="bb m mid hidden" id="r11-5" style="left:42px;top:208px"><div class="bt" id="r11-5-t">&nbsp;</div></div>
+  <div class="bb m bot hidden" id="r11-6" style="left:42px;top:208px"><div class="sh"></div><div class="bt" id="r11-6-t">&nbsp;</div></div>
+  <div class="hit" id="h0" style="top:32px"></div>
+  <div class="hit" id="h1" style="top:48px"></div>
+  <div class="hit" id="h2" style="top:64px"></div>
+  <div class="hit" id="h3" style="top:80px"></div>
+  <div class="hit" id="h4" style="top:96px"></div>
+  <div class="hit" id="h5" style="top:112px"></div>
+  <div class="hit" id="h6" style="top:128px"></div>
+  <div class="hit" id="h7" style="top:144px"></div>
+  <div class="hit" id="h8" style="top:160px"></div>
+  <div class="hit" id="h9" style="top:176px"></div>
+  <div class="hit" id="h10" style="top:192px"></div>
+  <div class="hit" id="h11" style="top:208px"></div>
+  <div id="in-rule"></div>
+  <div id="in-field"><div id="in-l1">Message</div><div id="in-l2">&nbsp;</div></div>
+  <div class="zone" id="zc00" style="left:10px;top:233px;width:40px;height:17px"></div>
+  <div class="zone" id="zc01" style="left:50px;top:233px;width:40px;height:17px"></div>
+  <div class="zone" id="zc02" style="left:90px;top:233px;width:40px;height:17px"></div>
+  <div class="zone" id="zc03" style="left:130px;top:233px;width:40px;height:17px"></div>
+  <div class="zone" id="zc10" style="left:10px;top:250px;width:40px;height:17px"></div>
+  <div class="zone" id="zc11" style="left:50px;top:250px;width:40px;height:17px"></div>
+  <div class="zone" id="zc12" style="left:90px;top:250px;width:40px;height:17px"></div>
+  <div class="zone" id="zc13" style="left:130px;top:250px;width:40px;height:17px"></div>
+  <div id="in-edit">[ ]</div>
+  <div id="in-send">&gt;</div>
 </div>
 
 <div class="page" id="compose">
-  <div class="hdr"><div class="back" id="cp-back">&lt;</div><div class="name">Message</div><div class="rule"></div></div>
+  <div class="hdr"><div class="back" id="cp-back">&lt;</div><div class="name" id="cp-title">Message</div><div class="rule"></div></div>
   <div id="cp-to" class="nowrap">To: Public</div>
-  <div id="cp-field"><div id="cp-text">|</div></div>
+  <div id="cp-field"><div class="cl" id="cp-l0">&nbsp;</div><div class="cl" id="cp-l1">&nbsp;</div><div class="cl" id="cp-l2">&nbsp;</div><div class="cl" id="cp-l3">&nbsp;</div><div class="cl" id="cp-l4">&nbsp;</div><div class="cl" id="cp-l5">&nbsp;</div></div>
+  <div class="zone" id="zf00" style="left:12px;top:64px;width:51px;height:17px"></div>
+  <div class="zone" id="zf01" style="left:63px;top:64px;width:51px;height:17px"></div>
+  <div class="zone" id="zf02" style="left:114px;top:64px;width:51px;height:17px"></div>
+  <div class="zone" id="zf03" style="left:165px;top:64px;width:51px;height:17px"></div>
+  <div class="zone" id="zf10" style="left:12px;top:81px;width:51px;height:17px"></div>
+  <div class="zone" id="zf11" style="left:63px;top:81px;width:51px;height:17px"></div>
+  <div class="zone" id="zf12" style="left:114px;top:81px;width:51px;height:17px"></div>
+  <div class="zone" id="zf13" style="left:165px;top:81px;width:51px;height:17px"></div>
+  <div class="zone" id="zf20" style="left:12px;top:98px;width:51px;height:17px"></div>
+  <div class="zone" id="zf21" style="left:63px;top:98px;width:51px;height:17px"></div>
+  <div class="zone" id="zf22" style="left:114px;top:98px;width:51px;height:17px"></div>
+  <div class="zone" id="zf23" style="left:165px;top:98px;width:51px;height:17px"></div>
+  <div class="zone" id="zf30" style="left:12px;top:115px;width:51px;height:17px"></div>
+  <div class="zone" id="zf31" style="left:63px;top:115px;width:51px;height:17px"></div>
+  <div class="zone" id="zf32" style="left:114px;top:115px;width:51px;height:17px"></div>
+  <div class="zone" id="zf33" style="left:165px;top:115px;width:51px;height:17px"></div>
+  <div class="zone" id="zf40" style="left:12px;top:132px;width:51px;height:17px"></div>
+  <div class="zone" id="zf41" style="left:63px;top:132px;width:51px;height:17px"></div>
+  <div class="zone" id="zf42" style="left:114px;top:132px;width:51px;height:17px"></div>
+  <div class="zone" id="zf43" style="left:165px;top:132px;width:51px;height:17px"></div>
+  <div class="zone" id="zf50" style="left:12px;top:149px;width:51px;height:17px"></div>
+  <div class="zone" id="zf51" style="left:63px;top:149px;width:51px;height:17px"></div>
+  <div class="zone" id="zf52" style="left:114px;top:149px;width:51px;height:17px"></div>
+  <div class="zone" id="zf53" style="left:165px;top:149px;width:51px;height:17px"></div>
   <div id="cp-hint" class="nowrap">Type the text, Enter sends</div>
   <div id="cp-status" class="nowrap"></div>
   <div class="btn" id="cp-send">Send</div>
+</div>
+
+<div class="page" id="add">
+  <div class="hdr"><div class="back" id="ad-back">&lt;</div><div class="name">New channel</div><div class="rule"></div></div>
+  <div id="ad-l1" class="nowrap">&gt; Name</div>
+  <div class="adf" id="ad-f1"><div class="at" id="ad-t1">|</div></div>
+  <div id="ad-l2" class="nowrap">Key</div>
+  <div class="adf" id="ad-f2"><div class="at" id="ad-t2">&nbsp;</div></div>
+  <div id="ad-hint" class="nowrap">A name with # needs no key</div>
+  <div id="ad-status" class="nowrap"></div>
+  <div class="btn" id="ad-go">Add</div>
 </div>
 
 </div>
@@ -112,7 +286,7 @@ body { font-size: 14px; line-height: 1.2; }
  * comes from properties that the application sets (dmod.prop), what the user does goes to the application as events (dmod.emit) - src/main.c is on
  * the other side. The names are the contract (docs/gui.md).
  */
-const pages = [document.getElementById('main'), document.getElementById('nodes'), document.getElementById('texts'), document.getElementById('compose')];
+const pages = [document.getElementById('main'), document.getElementById('nodes'), document.getElementById('chats'), document.getElementById('chat'), document.getElementById('compose'), document.getElementById('add')];
 function shown(el, on) { if (on) el.classList.remove('hidden'); else el.classList.add('hidden'); }
 
 /* Every character the application may send: the font of the view has only the characters of the page and of its scripts */
@@ -137,26 +311,31 @@ dmod.onchange('st.line1', () => stLine1.innerText = dmod.get('st.line1'));
 dmod.onchange('st.line2', () => stLine2.innerText = dmod.get('st.line2'));
 dmod.onchange('st.line3', () => stLine3.innerText = dmod.get('st.line3'));
 document.getElementById('open-nodes').addEventListener('click', () => dmod.emit('open.nodes'));
-document.getElementById('open-texts').addEventListener('click', () => dmod.emit('open.texts'));
+document.getElementById('open-texts').addEventListener('click', () => dmod.emit('open.chats'));
 document.getElementById('nodes-back').addEventListener('click', () => dmod.emit('back'));
-document.getElementById('texts-back').addEventListener('click', () => dmod.emit('back'));
-document.getElementById('texts-new').addEventListener('click', () => dmod.emit('new'));
+document.getElementById('chats-back').addEventListener('click', () => dmod.emit('back'));
+document.getElementById('chats-new').addEventListener('click', () => dmod.emit('new'));
+document.getElementById('chat-back').addEventListener('click', () => dmod.emit('back'));
+document.getElementById('chat-up').addEventListener('click', () => dmod.emit('older'));
+document.getElementById('chat-dn').addEventListener('click', () => dmod.emit('newer'));
+document.getElementById('in-edit').addEventListener('click', () => dmod.emit('edit'));
+document.getElementById('in-send').addEventListener('click', () => dmod.emit('send'));
 document.getElementById('cp-back').addEventListener('click', () => dmod.emit('back'));
 document.getElementById('cp-send').addEventListener('click', () => dmod.emit('send'));
+dmod.prop('cp.title', 'Message');
 dmod.prop('cp.to', 'To: Public');
-dmod.prop('cp.text', '|');
 dmod.prop('cp.hint', 'Type the text, Enter sends');
 dmod.prop('cp.status', '');
-const cpTo = document.getElementById('cp-to'), cpText = document.getElementById('cp-text'), cpHint = document.getElementById('cp-hint'),
+const cpTitle = document.getElementById('cp-title'), cpTo = document.getElementById('cp-to'), cpHint = document.getElementById('cp-hint'),
       cpStatus = document.getElementById('cp-status');
+dmod.onchange('cp.title', () => cpTitle.innerText = dmod.get('cp.title'));
 dmod.onchange('cp.to', () => cpTo.innerText = dmod.get('cp.to'));
-dmod.onchange('cp.text', () => cpText.innerText = dmod.get('cp.text'));
 dmod.onchange('cp.hint', () => cpHint.innerText = dmod.get('cp.hint'));
 dmod.onchange('cp.status', () => cpStatus.innerText = dmod.get('cp.status'));
 document.getElementById('prev-n').addEventListener('click', () => dmod.emit('prev'));
 document.getElementById('next-n').addEventListener('click', () => dmod.emit('next'));
-document.getElementById('prev-t').addEventListener('click', () => dmod.emit('prev'));
-document.getElementById('next-t').addEventListener('click', () => dmod.emit('next'));
+document.getElementById('prev-c').addEventListener('click', () => dmod.emit('prev'));
+document.getElementById('next-c').addEventListener('click', () => dmod.emit('next'));
 
 for (let i = 0; i < 5; i++) {
     dmod.prop('n' + i + '.on', 0);
@@ -171,22 +350,90 @@ dmod.prop('nodes.info', '');
 const nodesInfo = document.getElementById('nodes-info');
 dmod.onchange('nodes.info', () => nodesInfo.innerText = dmod.get('nodes.info'));
 
-for (let i = 0; i < 4; i++) {
-    dmod.prop('t' + i + '.on', 0);
-    dmod.prop('t' + i + '.who', 'Public');
-    dmod.prop('t' + i + '.l1', '');
-    dmod.prop('t' + i + '.l2', '');
-    const row = document.getElementById('t' + i), who = document.getElementById('t' + i + '-who'), l1 = document.getElementById('t' + i + '-l1'),
-          l2 = document.getElementById('t' + i + '-l2');
-    dmod.onchange('t' + i + '.who', () => who.innerText = dmod.get('t' + i + '.who'));
-    dmod.onchange('t' + i + '.l1', () => l1.innerText = dmod.get('t' + i + '.l1'));
-    dmod.onchange('t' + i + '.l2', () => l2.innerText = dmod.get('t' + i + '.l2'));
-    dmod.onchange('t' + i + '.on', () => shown(row, dmod.get('t' + i + '.on')));
+for (let i = 0; i < 5; i++) {
+    dmod.prop('c' + i + '.on', 0);
+    dmod.prop('c' + i + '.name', 'Public');
+    dmod.prop('c' + i + '.sub', '');
+    const row = document.getElementById('c' + i), name = document.getElementById('c' + i + '-name'), sub = document.getElementById('c' + i + '-sub');
+    dmod.onchange('c' + i + '.name', () => name.innerText = dmod.get('c' + i + '.name'));
+    dmod.onchange('c' + i + '.sub', () => sub.innerText = dmod.get('c' + i + '.sub'));
+    dmod.onchange('c' + i + '.on', () => shown(row, dmod.get('c' + i + '.on')));
     row.addEventListener('click', () => dmod.emit('row', i));
 }
-dmod.prop('texts.info', '');
-const textsInfo = document.getElementById('texts-info');
-dmod.onchange('texts.info', () => textsInfo.innerText = dmod.get('texts.info'));
+dmod.prop('chats.info', '');
+const chatsInfo = document.getElementById('chats-info');
+dmod.onchange('chats.info', () => chatsInfo.innerText = dmod.get('chats.info'));
+
+for (let i = 0; i < 12; i++) document.getElementById('h' + i).addEventListener('click', () => dmod.emit('brow', i));
+/* the chat: the title, the lines of the bubbles (r<i>.v: 0 none, 1-3 the head, a middle line and the last line of a bubble of the others, 4-6 of this node's; r<i>.t: the text), the field */
+dmod.prop('chat.title', 'Public');
+const chatName = document.getElementById('chat-name');
+dmod.onchange('chat.title', () => chatName.innerText = dmod.get('chat.title'));
+dmod.prop('in.l1', '');
+dmod.prop('in.l2', '');
+const inL1 = document.getElementById('in-l1'), inL2 = document.getElementById('in-l2');
+dmod.onchange('in.l1', () => inL1.innerText = dmod.get('in.l1'));
+dmod.onchange('in.l2', () => inL2.innerText = dmod.get('in.l2'));
+for (let i = 0; i < 12; i++) {
+    dmod.prop('r' + i + '.v', 0);
+    dmod.prop('r' + i + '.t', '');
+    const b1 = document.getElementById('r' + i + '-1'), b2 = document.getElementById('r' + i + '-2'), b3 = document.getElementById('r' + i + '-3'),
+          b4 = document.getElementById('r' + i + '-4'), b5 = document.getElementById('r' + i + '-5'), b6 = document.getElementById('r' + i + '-6');
+    const t1 = document.getElementById('r' + i + '-1-t'), t2 = document.getElementById('r' + i + '-2-t'), t3 = document.getElementById('r' + i + '-3-t'),
+          t4 = document.getElementById('r' + i + '-4-t'), t5 = document.getElementById('r' + i + '-5-t'), t6 = document.getElementById('r' + i + '-6-t');
+    dmod.onchange('r' + i + '.v', () => {
+        const v = dmod.get('r' + i + '.v');
+        shown(b1, v === 1); shown(b2, v === 2); shown(b3, v === 3); shown(b4, v === 4); shown(b5, v === 5); shown(b6, v === 6);
+    });
+    dmod.onchange('r' + i + '.t', () => {
+        const t = dmod.get('r' + i + '.t');
+        t1.innerText = t; t2.innerText = t; t3.innerText = t; t4.innerText = t; t5.innerText = t; t6.innerText = t;
+    });
+}
+dmod.prop('cp.l0', '');
+const cpL0 = document.getElementById('cp-l0');
+dmod.onchange('cp.l0', () => cpL0.innerText = dmod.get('cp.l0'));
+dmod.prop('cp.l1', '');
+const cpL1 = document.getElementById('cp-l1');
+dmod.onchange('cp.l1', () => cpL1.innerText = dmod.get('cp.l1'));
+dmod.prop('cp.l2', '');
+const cpL2 = document.getElementById('cp-l2');
+dmod.onchange('cp.l2', () => cpL2.innerText = dmod.get('cp.l2'));
+dmod.prop('cp.l3', '');
+const cpL3 = document.getElementById('cp-l3');
+dmod.onchange('cp.l3', () => cpL3.innerText = dmod.get('cp.l3'));
+dmod.prop('cp.l4', '');
+const cpL4 = document.getElementById('cp-l4');
+dmod.onchange('cp.l4', () => cpL4.innerText = dmod.get('cp.l4'));
+dmod.prop('cp.l5', '');
+const cpL5 = document.getElementById('cp-l5');
+dmod.onchange('cp.l5', () => cpL5.innerText = dmod.get('cp.l5'));
+for (let l = 0; l < 6; l++) {
+    document.getElementById('zf' + l + '0').addEventListener('click', () => dmod.emit('cf', l * 4));
+    document.getElementById('zf' + l + '1').addEventListener('click', () => dmod.emit('cf', l * 4 + 1));
+    document.getElementById('zf' + l + '2').addEventListener('click', () => dmod.emit('cf', l * 4 + 2));
+    document.getElementById('zf' + l + '3').addEventListener('click', () => dmod.emit('cf', l * 4 + 3));
+}
+for (let l = 0; l < 2; l++) {
+    document.getElementById('zc' + l + '0').addEventListener('click', () => dmod.emit('cc', l * 4));
+    document.getElementById('zc' + l + '1').addEventListener('click', () => dmod.emit('cc', l * 4 + 1));
+    document.getElementById('zc' + l + '2').addEventListener('click', () => dmod.emit('cc', l * 4 + 2));
+    document.getElementById('zc' + l + '3').addEventListener('click', () => dmod.emit('cc', l * 4 + 3));
+}
+/* the page of a new channel: two fields (the one that is marked with > takes the keys) */
+dmod.prop('ad.l1', '> Name'); dmod.prop('ad.l2', 'Key'); dmod.prop('ad.t1', '|'); dmod.prop('ad.t2', ''); dmod.prop('ad.hint', ''); dmod.prop('ad.status', '');
+const adL1 = document.getElementById('ad-l1'), adL2 = document.getElementById('ad-l2'), adT1 = document.getElementById('ad-t1'), adT2 = document.getElementById('ad-t2'),
+      adHint = document.getElementById('ad-hint'), adStatus = document.getElementById('ad-status');
+dmod.onchange('ad.l1', () => adL1.innerText = dmod.get('ad.l1'));
+dmod.onchange('ad.l2', () => adL2.innerText = dmod.get('ad.l2'));
+dmod.onchange('ad.t1', () => adT1.innerText = dmod.get('ad.t1'));
+dmod.onchange('ad.t2', () => adT2.innerText = dmod.get('ad.t2'));
+dmod.onchange('ad.hint', () => adHint.innerText = dmod.get('ad.hint'));
+dmod.onchange('ad.status', () => adStatus.innerText = dmod.get('ad.status'));
+document.getElementById('ad-back').addEventListener('click', () => dmod.emit('back'));
+document.getElementById('ad-go').addEventListener('click', () => dmod.emit('add'));
+document.getElementById('ad-f1').addEventListener('click', () => dmod.emit('sel', 0));
+document.getElementById('ad-f2').addEventListener('click', () => dmod.emit('sel', 1));
 </script>
 </body>
 </html>

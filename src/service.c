@@ -1,5 +1,6 @@
 #include "dmod.h"
 #include "internal.h"
+#include "dmini.h"
 #include "libsystemd_service.h"
 #include "dmdrvi_ioctl.h"
 #include "dmosi.h"
@@ -333,6 +334,8 @@ static void worker_main(void* arg)
         Dmod_FileClose(file);
 }
 
+static void load_channels_locked(void);
+
 /* ---- The library service (libsystemd) ---- */
 
 int libmeshcore_service_begin( const char* unit, int argc, const char* const argv[] )
@@ -350,6 +353,7 @@ int libmeshcore_service_begin( const char* unit, int argc, const char* const arg
     strcpy(g.unit, unit);
     strcpy(g.path, argv[1]);
     (void)libmeshcore_settings_load(&g.settings);
+    load_channels_locked();
     g.started = true;                                       /* (the thread of the module takes it from here: it was made when the module was loaded - a thread made
                                                              * here would belong to the process of the start of the unit, which ends with it) */
     changed();
@@ -522,37 +526,110 @@ dmod_libmeshcore_api_declaration(1.0, int, _log, ( libmeshcore_log_t* log, size_
     return 0;
 }
 
-dmod_libmeshcore_api_declaration(1.0, int, _channel_add, ( const char* name, const char* secret ))
+/* Add a channel to the slots (g.lock is held); 0, -ENOSPC, -EEXIST */
+static int add_channel_locked(const char* name, const libmeshcore_channel_t* channel)
 {
-    if (name == NULL || secret == NULL || name[0] == '\0' || g.lock == NULL)
-        return -EINVAL;
-    libmeshcore_channel_t channel;
-    int ret = libmeshcore_channel_from_text(&channel, secret);
-    if (ret != 0)
-        return ret;
-    dmosi_mutex_lock(g.lock);
-    ret = -ENOSPC;
     for (unsigned i = 0; i < LIBMESHCORE_MAX_CHANNELS; i++)
-    {
-        if (g.channels[i].used && memcmp(g.channels[i].channel.secret, channel.secret, sizeof(channel.secret)) == 0)
-        {
-            ret = -EEXIST;
-            break;
-        }
-    }
-    for (unsigned i = 0; ret == -ENOSPC && i < LIBMESHCORE_MAX_CHANNELS; i++)
+        if (g.channels[i].used && memcmp(g.channels[i].channel.secret, channel->secret, sizeof(channel->secret)) == 0)
+            return -EEXIST;
+    for (unsigned i = 0; i < LIBMESHCORE_MAX_CHANNELS; i++)
     {
         if (!g.channels[i].used)
         {
             memset(&g.channels[i], 0, sizeof(g.channels[i]));
             Dmod_SnPrintf(g.channels[i].name, sizeof(g.channels[i].name), "%s", name);
-            g.channels[i].channel = channel;
+            g.channels[i].channel = *channel;
             g.channels[i].used = true;
             changed();
-            ret = 0;
+            return 0;
         }
     }
+    return -ENOSPC;
+}
+
+/* The channels but the public one go to a file of their own: [channels] name<i>=, key<i>= (32 hex digits) */
+static void save_channels(void)
+{
+    dmini_context_t ini = dmini_create();
+    if (ini == NULL)
+        return;
+    char key[24], value[2U * LIBMESHCORE_CHANNEL_KEY_SIZE + 1U];
+    unsigned n = 0;
+    dmosi_mutex_lock(g.lock);
+    for (unsigned i = 1; i < LIBMESHCORE_MAX_CHANNELS; i++)
+    {
+        if (!g.channels[i].used)
+            continue;
+        Dmod_SnPrintf(key, sizeof(key), "name%u", n);
+        dmini_set_string(ini, "channels", key, g.channels[i].name);
+        for (unsigned b = 0; b < LIBMESHCORE_CHANNEL_KEY_SIZE; b++)
+            Dmod_SnPrintf(&value[2U * b], 3, "%02x", g.channels[i].channel.secret[b]);
+        Dmod_SnPrintf(key, sizeof(key), "key%u", n);
+        dmini_set_string(ini, "channels", key, value);
+        n++;
+    }
     dmosi_mutex_unlock(g.lock);
+    dmini_set_int(ini, "channels", "count", (int)n);
+    (void)dmini_generate_file(ini, LIBMESHCORE_CHANNELS_FILE);
+    dmini_destroy(ini);
+}
+
+/* (g.lock is held) */
+static void load_channels_locked(void)
+{
+    dmini_context_t ini = dmini_create();
+    if (ini == NULL)
+        return;
+    if (dmini_parse_file(ini, LIBMESHCORE_CHANNELS_FILE) == 0 && dmini_has_section(ini, "channels"))
+    {
+        int count = dmini_get_int(ini, "channels", "count", 0);
+        for (int i = 0; i < count && i < (int)LIBMESHCORE_MAX_CHANNELS; i++)
+        {
+            char key[24];
+            Dmod_SnPrintf(key, sizeof(key), "name%d", i);
+            const char* name = dmini_get_string(ini, "channels", key, NULL);
+            Dmod_SnPrintf(key, sizeof(key), "key%d", i);
+            const char* secret = dmini_get_string(ini, "channels", key, NULL);
+            libmeshcore_channel_t channel;
+            if (name != NULL && secret != NULL && name[0] != '\0' && libmeshcore_channel_from_text(&channel, secret) == 0)
+                (void)add_channel_locked(name, &channel);
+        }
+    }
+    dmini_destroy(ini);
+}
+
+dmod_libmeshcore_api_declaration(1.0, int, _channel_add, ( const char* name, const char* secret ))
+{
+    if (name == NULL || name[0] == '\0' || g.lock == NULL)
+        return -EINVAL;
+    if (secret == NULL || secret[0] == '\0')
+        secret = name;                                          /* "#test": the key is made of the name */
+    libmeshcore_channel_t channel;
+    int ret = libmeshcore_channel_from_text(&channel, secret);
+    if (ret != 0)
+        return ret;
+    dmosi_mutex_lock(g.lock);
+    ret = add_channel_locked(name, &channel);
+    dmosi_mutex_unlock(g.lock);
+    if (ret == 0)
+        save_channels();
+    return ret;
+}
+
+dmod_libmeshcore_api_declaration(1.0, int, _channel_remove, ( uint8_t index ))
+{
+    if (index == 0 || index >= LIBMESHCORE_MAX_CHANNELS || g.lock == NULL)
+        return -EINVAL;
+    dmosi_mutex_lock(g.lock);
+    int ret = g.channels[index].used ? 0 : -ENOENT;
+    if (ret == 0)
+    {
+        memset(&g.channels[index], 0, sizeof(g.channels[index]));
+        changed();
+    }
+    dmosi_mutex_unlock(g.lock);
+    if (ret == 0)
+        save_channels();
     return ret;
 }
 

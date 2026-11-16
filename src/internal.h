@@ -14,5 +14,6 @@ int libmeshcore_service_begin(const char* unit, int argc, const char* const argv
 int libmeshcore_service_end(const char* unit);
 
 #define LIBMESHCORE_SETTINGS_FILE   "/ext/meshcore.ini"
+#define LIBMESHCORE_CHANNELS_FILE   "/ext/meshcore-channels.ini"
 
 #endif

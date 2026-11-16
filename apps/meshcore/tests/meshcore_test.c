@@ -77,20 +77,49 @@ DMOD_TEST_STEP(time_of_day_in_the_local_time)
     meshcore_clock(0, 60, true, s, sizeof(s));             DMOD_TEST_EXPECT_TRUE(strcmp(s, "--:--") == 0);
 }
 
-DMOD_TEST_STEP(first_line_of_a_text)
+DMOD_TEST_STEP(lines_of_a_bubble)
+{
+    char lines[6][48];
+    /* a short text is a line; the words are not cut; the lines are the width or less */
+    DMOD_TEST_EXPECT_EQ((int)meshcore_wrap_lines("short", 25, &lines[0][0], 48, 6), 1);
+    DMOD_TEST_EXPECT_TRUE(strcmp(lines[0], "short") == 0);
+    DMOD_TEST_EXPECT_EQ((int)meshcore_wrap_lines("", 25, &lines[0][0], 48, 6), 0);
+    size_t n = meshcore_wrap_lines("czesc wszystkim, jak sie macie dzisiaj wieczorem na gorze", 25, &lines[0][0], 48, 6);
+    DMOD_TEST_EXPECT_EQ((int)n, 3);
+    DMOD_TEST_EXPECT_TRUE(strcmp(lines[0], "czesc wszystkim, jak sie") == 0);
+    DMOD_TEST_EXPECT_TRUE(strcmp(lines[1], "macie dzisiaj wieczorem") == 0);
+    DMOD_TEST_EXPECT_TRUE(strcmp(lines[2], "na gorze") == 0);
+    /* what does not fit in the lines there is room for ends in an ellipsis */
+    n = meshcore_wrap_lines("aaaa bbbb cccc dddd eeee ffff gggg hhhh", 10, &lines[0][0], 48, 2);
+    DMOD_TEST_EXPECT_EQ((int)n, 2);
+    DMOD_TEST_EXPECT_TRUE(strcmp(lines[0], "aaaa bbbb") == 0);
+    DMOD_TEST_EXPECT_TRUE(strcmp(lines[1] + strlen(lines[1]) - 3, "\xE2\x80\xA6") == 0);
+    /* a word longer than the line is cut */
+    n = meshcore_wrap_lines("0123456789012345678901234", 10, &lines[0][0], 48, 6);
+    DMOD_TEST_EXPECT_EQ((int)n, 3);
+    DMOD_TEST_EXPECT_EQ((int)strlen(lines[0]), 10);
+}
+
+DMOD_TEST_STEP(head_of_a_bubble)
 {
     libmeshcore_message_t m;
-    char s[48];
+    char sender[32], head[64];
+    const char* body;
     memset(&m, 0, sizeof(m));
-    strcpy(m.channel, "Public");
+    meshcore_split_sender("Amadis Banino: czesc: wszystkim", sender, sizeof(sender), &body);
+    DMOD_TEST_EXPECT_TRUE(strcmp(sender, "Amadis Banino") == 0 && strcmp(body, "czesc: wszystkim") == 0);
+    meshcore_split_sender("no sender", sender, sizeof(sender), &body);
+    DMOD_TEST_EXPECT_TRUE(sender[0] == '\0' && strcmp(body, "no sender") == 0);
     m.heard_utc = 1794747900u;
     m.hops = 0;
-    meshcore_who(&m, 60, true, s, sizeof(s));      DMOD_TEST_EXPECT_TRUE(strcmp(s, "Public, 14:05, 0 hops") == 0);
+    meshcore_bubble_head(&m, "Amadis", 60, true, head, sizeof(head));   DMOD_TEST_EXPECT_TRUE(strcmp(head, "Amadis \xC2\xB7 14:05 \xC2\xB7 direct") == 0);
     m.hops = 1;
-    meshcore_who(&m, 60, true, s, sizeof(s));      DMOD_TEST_EXPECT_TRUE(strcmp(s, "Public, 14:05, 1 hop") == 0);
+    meshcore_bubble_head(&m, "Amadis", 60, true, head, sizeof(head));   DMOD_TEST_EXPECT_TRUE(strcmp(head, "Amadis \xC2\xB7 14:05 \xC2\xB7 1 hop") == 0);
+    m.hops = 3;
+    meshcore_bubble_head(&m, "", 60, true, head, sizeof(head));         DMOD_TEST_EXPECT_TRUE(strcmp(head, "? \xC2\xB7 14:05 \xC2\xB7 3 hops") == 0);
     m.mine = true;
     m.heard_utc = 0;                                /* the clock was not set */
-    meshcore_who(&m, 60, true, s, sizeof(s));      DMOD_TEST_EXPECT_TRUE(strcmp(s, "> Public, 1 hop") == 0);
+    meshcore_bubble_head(&m, "me", 60, true, head, sizeof(head));       DMOD_TEST_EXPECT_TRUE(strcmp(head, "You \xC2\xB7 --:--") == 0);
 }
 
 DMOD_TEST_STEP(reply_and_typing)
@@ -101,17 +130,48 @@ DMOD_TEST_STEP(reply_and_typing)
     meshcore_reply_prefix("no sender here", s, sizeof(s));
     DMOD_TEST_EXPECT_TRUE(s[0] == '\0');
     char t[8] = "";
-    DMOD_TEST_EXPECT_TRUE(meshcore_append(t, sizeof(t), 'a'));
-    DMOD_TEST_EXPECT_TRUE(meshcore_append(t, sizeof(t), 0x105));          /* a with an ogonek: 2 bytes */
-    DMOD_TEST_EXPECT_TRUE(strcmp(t, "a\xC4\x85") == 0);
-    DMOD_TEST_EXPECT_TRUE(!meshcore_append(t, sizeof(t), 0x0A));          /* a control character is not text */
-    meshcore_backspace(t);                                                /* the whole character goes */
-    DMOD_TEST_EXPECT_TRUE(strcmp(t, "a") == 0);
-    meshcore_backspace(t);
-    meshcore_backspace(t);                                                /* nothing to remove */
+    size_t c = meshcore_insert(t, sizeof(t), 0, 'a');
+    c = meshcore_insert(t, sizeof(t), c, 0x105);                          /* a with an ogonek: 2 bytes */
+    DMOD_TEST_EXPECT_TRUE(strcmp(t, "a\xC4\x85") == 0 && c == 3u);
+    DMOD_TEST_EXPECT_EQ((int)meshcore_insert(t, sizeof(t), c, 0x0A), 3);   /* a control character is not text */
+    c = meshcore_delete_before(t, c);                                     /* the whole character goes */
+    DMOD_TEST_EXPECT_TRUE(strcmp(t, "a") == 0 && c == 1u);
+    c = meshcore_delete_before(t, c);
+    DMOD_TEST_EXPECT_EQ((int)meshcore_delete_before(t, c), 0);            /* nothing to remove */
     DMOD_TEST_EXPECT_TRUE(t[0] == '\0');
     char full[3] = "";
-    DMOD_TEST_EXPECT_TRUE(meshcore_append(full, sizeof(full), 'x'));
-    DMOD_TEST_EXPECT_TRUE(meshcore_append(full, sizeof(full), 'y'));
-    DMOD_TEST_EXPECT_TRUE(!meshcore_append(full, sizeof(full), 'z'));     /* no room for it and the end */
+    c = meshcore_insert(full, sizeof(full), 0, 'x');
+    c = meshcore_insert(full, sizeof(full), c, 'y');
+    DMOD_TEST_EXPECT_EQ((int)meshcore_insert(full, sizeof(full), c, 'z'), 2);   /* no room for it and the end: the cursor stays */
+    DMOD_TEST_EXPECT_TRUE(strcmp(full, "xy") == 0);
+}
+
+DMOD_TEST_STEP(the_cursor_moves_in_the_text)
+{
+    char t[24] = "abcd";
+    /* a character in the middle of a text */
+    size_t c = meshcore_insert(t, sizeof(t), 2, 'X');
+    DMOD_TEST_EXPECT_TRUE(strcmp(t, "abXcd") == 0 && c == 3u);
+    c = meshcore_delete_before(t, c);
+    c = meshcore_delete_before(t, c);
+    DMOD_TEST_EXPECT_TRUE(strcmp(t, "acd") == 0 && c == 1u);
+    /* the arrows move by a whole character */
+    strcpy(t, "a\xC4\x85z");
+    DMOD_TEST_EXPECT_EQ((int)meshcore_cursor_move(t, 0, 1), 1);
+    DMOD_TEST_EXPECT_EQ((int)meshcore_cursor_move(t, 1, 1), 3);
+    DMOD_TEST_EXPECT_EQ((int)meshcore_cursor_move(t, 3, -1), 1);
+    DMOD_TEST_EXPECT_EQ((int)meshcore_cursor_move(t, 0, -1), 0);
+    DMOD_TEST_EXPECT_EQ((int)meshcore_cursor_move(t, 4, 1), 4);
+    /* the lines of an edited text lose nothing; a tap puts the cursor in the line */
+    size_t starts[8];
+    const char* text = "aaaa bbbb cccc dddd";
+    size_t n = meshcore_edit_lines(text, 10, starts, 8);
+    DMOD_TEST_EXPECT_EQ((int)n, 2);
+    DMOD_TEST_EXPECT_EQ((int)starts[0], 0);
+    DMOD_TEST_EXPECT_EQ((int)starts[1], 10);                              /* "aaaa bbbb " | "cccc dddd" */
+    DMOD_TEST_EXPECT_EQ((int)meshcore_edit_lines("", 10, starts, 8), 1);
+    DMOD_TEST_EXPECT_EQ((int)meshcore_edit_lines("0123456789012", 10, starts, 8), 2);
+    DMOD_TEST_EXPECT_EQ((int)meshcore_line_cursor(text, 10, 19, 0, 4), 10);
+    DMOD_TEST_EXPECT_EQ((int)meshcore_line_cursor(text, 10, 19, 3, 4), 19);
+    DMOD_TEST_EXPECT_EQ((int)meshcore_line_cursor(text, 10, 19, 1, 4), 13);
 }

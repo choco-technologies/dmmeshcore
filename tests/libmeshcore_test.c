@@ -233,5 +233,23 @@ DMOD_TEST_STEP(channels_are_added_once)
     DMOD_TEST_EXPECT_EQ(libmeshcore_channel_add("Bad", "not a key"), -EINVAL);
     DMOD_TEST_EXPECT_EQ(libmeshcore_channel_name(1, name, sizeof(name), &hash), 0);
     DMOD_TEST_EXPECT_TRUE(strcmp(name, "Friends") == 0);
-    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_name(3, name, sizeof(name), &hash), -ENOENT);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_name(2, name, sizeof(name), &hash), -ENOENT);
+
+    /* a channel of a name needs no key: the key is made of the name (and the places after the removed one are free again) */
+    libmeshcore_channel_t a, b;
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_from_text(&a, "#test"), 0);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_from_text(&b, "#test"), 0);
+    DMOD_TEST_EXPECT_EQ(memcmp(a.secret, b.secret, sizeof(a.secret)), 0);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_from_text(&b, "#other"), 0);
+    DMOD_TEST_EXPECT_TRUE(memcmp(a.secret, b.secret, sizeof(a.secret)) != 0);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_add("#test", NULL), 0);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_add("#test", ""), -EEXIST);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_add("plain", NULL), -EINVAL);          /* no '#' and no key */
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_name(2, name, sizeof(name), &hash), 0);
+    DMOD_TEST_EXPECT_TRUE(strcmp(name, "#test") == 0);
+    DMOD_TEST_EXPECT_EQ(hash, a.hash);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_remove(0), -EINVAL);                    /* the public one stays */
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_remove(2), 0);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_remove(2), -ENOENT);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_name(2, name, sizeof(name), &hash), -ENOENT);
 }

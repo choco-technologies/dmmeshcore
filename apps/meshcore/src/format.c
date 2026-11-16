@@ -84,6 +84,81 @@ void meshcore_wrap(const char* text, size_t width, char* line1, char* line2, siz
     }
 }
 
+size_t meshcore_wrap_lines(const char* text, size_t width, char* lines, size_t line_size, size_t max_lines)
+{
+    size_t count = 0;
+    if (width + 1u > line_size)
+        width = line_size - 1u;
+    const char* rest = text;
+    while (count < max_lines)
+    {
+        while (*rest == ' ')
+            rest++;
+        if (*rest == '\0')
+            break;
+        char* line = lines + count * line_size;
+        size_t n = fit(rest, width);
+        if (rest[n] != '\0' && count + 1u == max_lines)
+        {
+            /* the last line there is room for: what does not fit ends in "..." */
+            n = fit(rest, width > 3u ? width - 3u : 0u);
+            memcpy(line, rest, n);
+            memcpy(line + n, "\xE2\x80\xA6", 4);
+            count++;
+            break;
+        }
+        size_t cut = n;
+        if (rest[n] != '\0')
+        {
+            /* break at the last space of the line when there is one in its second half */
+            while (cut > n / 2u && rest[cut] != ' ')
+                cut--;
+            if (rest[cut] != ' ')
+                cut = n;
+        }
+        size_t end = cut;
+        while (end > 0u && rest[end - 1u] == ' ')
+            end--;
+        memcpy(line, rest, end);
+        line[end] = '\0';
+        rest += cut;
+        count++;
+    }
+    return count;
+}
+
+void meshcore_split_sender(const char* text, char* sender, size_t sender_size, const char** body)
+{
+    const char* colon = text;
+    while (*colon != '\0' && !(colon[0] == ':' && colon[1] == ' '))      /* (no strstr in a module) */
+        colon++;
+    if (*colon == '\0' || colon == text || (size_t)(colon - text) >= sender_size)
+    {
+        sender[0] = '\0';
+        *body = text;
+        return;
+    }
+    memcpy(sender, text, (size_t)(colon - text));
+    sender[colon - text] = '\0';
+    *body = colon + 2;
+}
+
+void meshcore_bubble_head(const libmeshcore_message_t* message, const char* sender, int offset_min, bool eu_dst, char* out, size_t size)
+{
+    char clock[8], hops[16];
+    meshcore_clock(message->heard_utc, offset_min, eu_dst, clock, sizeof(clock));
+    if (message->mine)
+        Dmod_SnPrintf(out, size, "You \xC2\xB7 %s", clock);
+    else
+    {
+        if (message->hops == 0u)
+            Dmod_SnPrintf(hops, sizeof(hops), "direct");
+        else
+            Dmod_SnPrintf(hops, sizeof(hops), "%u hop%s", (unsigned)message->hops, message->hops == 1 ? "" : "s");
+        Dmod_SnPrintf(out, size, "%s \xC2\xB7 %s \xC2\xB7 %s", sender[0] != '\0' ? sender : "?", clock, hops);
+    }
+}
+
 void meshcore_range(size_t first, size_t shown, size_t total, char* out, size_t size)
 {
     if (total == 0u || shown == 0u)
@@ -144,19 +219,6 @@ void meshcore_clock(uint32_t utc_seconds, int offset_min, bool eu_dst, char* out
     Dmod_SnPrintf(out, size, "%02u:%02u", (unsigned)(rest / 3600), (unsigned)(rest % 3600 / 60));
 }
 
-void meshcore_who(const libmeshcore_message_t* message, int offset_min, bool eu_dst, char* out, size_t size)
-{
-    char clock[8];
-    const char* mine = message->mine ? "> " : "";
-    if (message->heard_utc != 0u)
-    {
-        meshcore_clock(message->heard_utc, offset_min, eu_dst, clock, sizeof(clock));
-        Dmod_SnPrintf(out, size, "%s%s, %s, %u hop%s", mine, message->channel, clock, (unsigned)message->hops, message->hops == 1 ? "" : "s");
-    }
-    else
-        Dmod_SnPrintf(out, size, "%s%s, %u hop%s", mine, message->channel, (unsigned)message->hops, message->hops == 1 ? "" : "s");
-}
-
 void meshcore_reply_prefix(const char* text, char* out, size_t size)
 {
     out[0] = '\0';
@@ -168,46 +230,109 @@ void meshcore_reply_prefix(const char* text, char* out, size_t size)
     Dmod_SnPrintf(out, size, "@[%.*s] ", (int)(colon - text), text);
 }
 
-bool meshcore_append(char* text, size_t capacity, uint32_t codepoint)
+static size_t utf8_encode(uint32_t codepoint, char* utf8)
 {
-    char utf8[4];
-    size_t n;
     if (codepoint < 0x20u || codepoint == 0x7Fu)
-        return false;
+        return 0;
     if (codepoint < 0x80u)
     {
         utf8[0] = (char)codepoint;
-        n = 1;
+        return 1;
     }
-    else if (codepoint < 0x800u)
+    if (codepoint < 0x800u)
     {
         utf8[0] = (char)(0xC0u | (codepoint >> 6));
         utf8[1] = (char)(0x80u | (codepoint & 0x3Fu));
-        n = 2;
+        return 2;
     }
-    else if (codepoint < 0x10000u)
+    if (codepoint < 0x10000u)
     {
         utf8[0] = (char)(0xE0u | (codepoint >> 12));
         utf8[1] = (char)(0x80u | ((codepoint >> 6) & 0x3Fu));
         utf8[2] = (char)(0x80u | (codepoint & 0x3Fu));
-        n = 3;
+        return 3;
     }
-    else
-        return false;
-    size_t length = strlen(text);
-    if (length + n + 1u > capacity)
-        return false;
-    memcpy(text + length, utf8, n);
-    text[length + n] = '\0';
-    return true;
+    return 0;
 }
 
-void meshcore_backspace(char* text)
+size_t meshcore_insert(char* text, size_t capacity, size_t cursor, uint32_t codepoint)
+{
+    char utf8[4];
+    size_t n = utf8_encode(codepoint, utf8);
+    size_t length = strlen(text);
+    if (cursor > length)
+        cursor = length;
+    if (n == 0u || length + n + 1u > capacity)
+        return cursor;
+    memmove(text + cursor + n, text + cursor, length - cursor + 1u);
+    memcpy(text + cursor, utf8, n);
+    return cursor + n;
+}
+
+/* The start of the character that ends at `cursor` */
+static size_t previous_start(const char* text, size_t cursor)
+{
+    if (cursor == 0u)
+        return 0u;
+    size_t at = cursor - 1u;
+    while (at > 0u && ((unsigned char)text[at] & 0xC0u) == 0x80u)
+        at--;
+    return at;
+}
+
+size_t meshcore_delete_before(char* text, size_t cursor)
 {
     size_t length = strlen(text);
-    while (length > 0u && ((unsigned char)text[length - 1u] & 0xC0u) == 0x80u)
-        length--;                                                   /* the continuation bytes of the last character */
-    if (length > 0u)
-        length--;
-    text[length] = '\0';
+    if (cursor > length)
+        cursor = length;
+    size_t start = previous_start(text, cursor);
+    if (start == cursor)
+        return cursor;
+    memmove(text + start, text + cursor, length - cursor + 1u);
+    return start;
+}
+
+size_t meshcore_cursor_move(const char* text, size_t cursor, int direction)
+{
+    size_t length = strlen(text);
+    if (cursor > length)
+        cursor = length;
+    if (direction < 0)
+        return previous_start(text, cursor);
+    if (cursor < length)
+        return cursor + char_length(text + cursor);
+    return cursor;
+}
+
+size_t meshcore_edit_lines(const char* text, size_t width, size_t* starts, size_t max)
+{
+    size_t count = 0, at = 0;
+    do
+    {
+        if (count >= max)
+            break;
+        starts[count++] = at;
+        size_t n = fit(text + at, width);
+        if (text[at + n] != '\0')
+        {
+            /* a break after the last space of the line, when there is one past its first third */
+            size_t cut = n;
+            while (cut > n / 3u && text[at + cut - 1u] != ' ')
+                cut--;
+            n = (cut > n / 3u && text[at + cut - 1u] == ' ') ? cut : n;
+        }
+        at += n;
+    } while (text[at] != '\0');
+    return count;
+}
+
+size_t meshcore_line_cursor(const char* text, size_t start, size_t end, unsigned zone, unsigned zones)
+{
+    size_t target = zones > 1u ? start + (end - start) * zone / (zones - 1u) : start;
+    size_t at = start;
+    while (at < target && at < end)
+        at += char_length(text + at);
+    if (at > end)
+        at = end;
+    return at;
 }

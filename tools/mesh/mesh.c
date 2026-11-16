@@ -10,7 +10,8 @@
  *   mesh settings                 the settings
  *   mesh set KEY=VALUE...         preset (0..3), frequency, bandwidth, sf, cr, power, name, enabled
  *   mesh presets                  the presets
- *   mesh channel NAME KEY         listen to a channel (KEY: base64 or 32 hex digits)
+ *   mesh channel NAME [KEY]       listen to a channel (KEY: base64 or 32 hex digits; none for a name that begins with '#', like "#test")
+ *   mesh unchannel INDEX          stop listening to a channel (not the public one)
  *   mesh send CHANNEL TEXT        send a text (a flood) to a channel
  *   mesh watch [SECONDS]          print what comes */
 
@@ -178,8 +179,13 @@ int main(int argc, char* argv[])
             Dmod_Printf("%us ago  %d dBm snr %d  %u bytes  %s %s  %u hops  channel #%02x\n", (unsigned)l[i].age_s, (int)l[i].rssi_dbm, (int)l[i].snr_db,
                         (unsigned)l[i].length, libmeshcore_route_name(l[i].route), libmeshcore_type_name(l[i].type), (unsigned)l[i].hops, (unsigned)l[i].channel_hash);
     }
-    else if (strcmp(action, "channel") == 0 && argc == 4)
-        ret = libmeshcore_channel_add(argv[2], argv[3]);
+    else if (strcmp(action, "channel") == 0 && (argc == 3 || argc == 4))
+        ret = libmeshcore_channel_add(argv[2], argc == 4 ? argv[3] : NULL);
+    else if (strcmp(action, "unchannel") == 0 && argc == 3)
+    {
+        long index = 0;
+        ret = number(argv[2], &index) ? libmeshcore_channel_remove((uint8_t)index) : -EINVAL;
+    }
     else if (strcmp(action, "send") == 0 && argc == 4)
     {
         long index = 0;
@@ -195,6 +201,6 @@ int main(int argc, char* argv[])
     else
         ret = -EINVAL;
     if (ret != 0)
-        Dmod_Printf("mesh: error %d\nusage: mesh [status|nodes|texts|log|settings|presets|set KEY=VALUE...|channel NAME KEY|send CHANNEL TEXT|watch [SECONDS]]\n", ret);
+        Dmod_Printf("mesh: error %d\nusage: mesh [status|nodes|texts|log|settings|presets|set KEY=VALUE...|channel NAME [KEY]|unchannel INDEX|send CHANNEL TEXT|watch [SECONDS]]\n", ret);
     return ret == 0 ? 0 : 1;
 }

@@ -130,7 +130,7 @@ dmod_libmeshcore_api(1.0, int, _advert_decode, ( const libmeshcore_packet_t* pac
 /** @brief A channel from its 16-byte secret. */
 dmod_libmeshcore_api(1.0, int, _channel_init, ( libmeshcore_channel_t* channel, const uint8_t* secret ));
 
-/** @brief A channel from the secret in base64 (as the apps show it: "izOH6cXN6mrJ5e26oRXNcg==" is the public channel) or in 32 hex digits. 0 or -EINVAL. */
+/** @brief A channel from the secret in base64 (as the apps show it: "izOH6cXN6mrJ5e26oRXNcg==" is the public channel), in 32 hex digits, or from a name that begins with '#' ("#test": the key is made of the name). 0 or -EINVAL. */
 dmod_libmeshcore_api(1.0, int, _channel_from_text, ( libmeshcore_channel_t* channel, const char* text ));
 
 /**
@@ -150,9 +150,9 @@ dmod_libmeshcore_api(1.0, int, _group_text_encode, ( const libmeshcore_channel_t
 
 #define LIBMESHCORE_NODE_NAME_MAX   31      /**< The name of this node (without the terminator). */
 #define LIBMESHCORE_MAX_CONTACTS    16      /**< The nodes it remembers (the oldest is forgotten). */
-#define LIBMESHCORE_MAX_MESSAGES    12      /**< The texts it remembers. */
+#define LIBMESHCORE_MAX_MESSAGES    32      /**< The texts it remembers. */
 #define LIBMESHCORE_MAX_PACKETS     16      /**< The packets of the log. */
-#define LIBMESHCORE_MAX_CHANNELS    4       /**< The channels it listens to (the public one is the first). */
+#define LIBMESHCORE_MAX_CHANNELS    8       /**< The channels it listens to (the public one is the first). */
 #define LIBMESHCORE_CHANNEL_NAME_MAX 15
 #define LIBMESHCORE_MESSAGE_TEXT_MAX 120
 
@@ -268,8 +268,15 @@ dmod_libmeshcore_api(1.0, int, _messages, ( libmeshcore_message_t* messages, siz
 /** @brief The log of the packets heard, the most recent first. */
 dmod_libmeshcore_api(1.0, int, _log, ( libmeshcore_log_t* log, size_t capacity, size_t* count ));
 
-/** @brief Listen to one more channel (from its secret: base64 or 32 hex digits; the name is for the screen). 0, -EINVAL, -ENOSPC (all the places are taken), -EEXIST. */
+/**
+ * @brief Listen to one more channel (from its secret: base64 or 32 hex digits; the name is for the screen). A name that begins with '#' needs no secret
+ *        (NULL or ""): "#test" is the channel everybody gets who types "#test". The channels are kept in /ext/meshcore-channels.ini.
+ *        0, -EINVAL, -ENOSPC (all the places are taken), -EEXIST.
+ */
 dmod_libmeshcore_api(1.0, int, _channel_add, ( const char* name, const char* secret ));
+
+/** @brief Stop listening to the channel `index` (not the public one, 0). 0, -EINVAL, -ENOENT. The texts that were heard stay. */
+dmod_libmeshcore_api(1.0, int, _channel_remove, ( uint8_t index ));
 
 /** @brief The channels: `name` of the channel `index` (0 is the public one); -ENOENT when there is none. */
 dmod_libmeshcore_api(1.0, int, _channel_name, ( uint8_t index, char* name, size_t capacity, uint8_t* hash ));
