@@ -48,6 +48,7 @@ void libmeshcore_settings_defaults(libmeshcore_settings_t* s)
     s->spreading_factor = p.spreading_factor;
     s->coding_rate = p.coding_rate;
     s->tx_power_dbm = 14;
+    s->path_hash_size = 1;
     Dmod_SnPrintf(s->name, sizeof(s->name), "DMOD node");
 }
 
@@ -67,7 +68,8 @@ int libmeshcore_settings_check(libmeshcore_settings_t* s)
     s->name[LIBMESHCORE_NODE_NAME_MAX] = '\0';
     /* (the limits of the SX126x: the radio refuses the rest anyway, this says it before it is kept) */
     if (s->name[0] == '\0' || s->frequency_hz < 150000000u || s->frequency_hz > 960000000u || s->bandwidth_hz < 7800u || s->bandwidth_hz > 500000u ||
-        s->spreading_factor < 5 || s->spreading_factor > 12 || s->coding_rate < 5 || s->coding_rate > 8 || s->tx_power_dbm < -9 || s->tx_power_dbm > 22)
+        s->spreading_factor < 5 || s->spreading_factor > 12 || s->coding_rate < 5 || s->coding_rate > 8 || s->tx_power_dbm < -9 || s->tx_power_dbm > 22 ||
+        s->path_hash_size < 1 || s->path_hash_size > 3)
         return -EINVAL;
     return 0;
 }
@@ -91,6 +93,7 @@ int libmeshcore_settings_load(libmeshcore_settings_t* s)
     t.spreading_factor = (uint8_t)dmini_get_int(ini, "meshcore", "spreading_factor", t.spreading_factor);
     t.coding_rate = (uint8_t)dmini_get_int(ini, "meshcore", "coding_rate", t.coding_rate);
     t.tx_power_dbm = (int8_t)dmini_get_int(ini, "meshcore", "tx_power_dbm", t.tx_power_dbm);
+    t.path_hash_size = (uint8_t)dmini_get_int(ini, "meshcore", "path_hash_size", t.path_hash_size);
     const char* name = dmini_get_string(ini, "meshcore", "name", NULL);
     if (name != NULL && name[0] != '\0')
     {
@@ -114,6 +117,7 @@ int libmeshcore_settings_save(const libmeshcore_settings_t* s)
     dmini_set_int(ini, "meshcore", "spreading_factor", s->spreading_factor);
     dmini_set_int(ini, "meshcore", "coding_rate", s->coding_rate);
     dmini_set_int(ini, "meshcore", "tx_power_dbm", s->tx_power_dbm);
+    dmini_set_int(ini, "meshcore", "path_hash_size", s->path_hash_size);
     dmini_set_string(ini, "meshcore", "name", s->name);
     int ret = dmini_generate_file(ini, LIBMESHCORE_SETTINGS_FILE);
     dmini_destroy(ini);

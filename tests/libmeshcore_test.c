@@ -198,6 +198,12 @@ DMOD_TEST_STEP(presets_and_settings_are_checked)
     s.tx_power_dbm = 30;
     DMOD_TEST_EXPECT_EQ(libmeshcore_settings_set(&s), -EINVAL);
     s.tx_power_dbm = 10;
+    DMOD_TEST_EXPECT_EQ(s.path_hash_size, 1);                       /* the default */
+    s.path_hash_size = 4;
+    DMOD_TEST_EXPECT_EQ(libmeshcore_settings_set(&s), -EINVAL);
+    s.path_hash_size = 0;
+    DMOD_TEST_EXPECT_EQ(libmeshcore_settings_set(&s), -EINVAL);
+    s.path_hash_size = 2;
     s.name[0] = '\0';
     DMOD_TEST_EXPECT_EQ(libmeshcore_settings_set(&s), -EINVAL);
 }

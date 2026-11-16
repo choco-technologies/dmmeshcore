@@ -8,7 +8,7 @@
  *   mesh [status]                 the service and the counters
  *   mesh nodes | texts | log      what was heard
  *   mesh settings                 the settings
- *   mesh set KEY=VALUE...         preset (0..3), frequency, bandwidth, sf, cr, power, name, enabled
+ *   mesh set KEY=VALUE...         preset (0..3), frequency, bandwidth, sf, cr, power, pathhash (1..3), name, enabled
  *   mesh presets                  the presets
  *   mesh channel NAME [KEY]       listen to a channel (KEY: base64 or 32 hex digits; none for a name that begins with '#', like "#test")
  *   mesh unchannel INDEX          stop listening to a channel (not the public one)
@@ -47,8 +47,8 @@ static void print_settings(void)
     libmeshcore_preset_info_t p;
     (void)libmeshcore_settings_get(&s);
     (void)libmeshcore_preset(s.preset, &p);
-    Dmod_Printf("%s  preset %u (%s)  %u Hz  %u Hz  SF%u  4/%u  %d dBm  name \"%s\"\n", s.enabled ? "on" : "off", (unsigned)s.preset, p.name,
-                (unsigned)s.frequency_hz, (unsigned)s.bandwidth_hz, (unsigned)s.spreading_factor, (unsigned)s.coding_rate, (int)s.tx_power_dbm, s.name);
+    Dmod_Printf("%s  preset %u (%s)  %u Hz  %u Hz  SF%u  4/%u  %d dBm  path hash %u B  name \"%s\"\n", s.enabled ? "on" : "off", (unsigned)s.preset, p.name,
+                (unsigned)s.frequency_hz, (unsigned)s.bandwidth_hz, (unsigned)s.spreading_factor, (unsigned)s.coding_rate, (int)s.tx_power_dbm, (unsigned)s.path_hash_size, s.name);
 }
 
 static int set_values(int argc, char** argv)
@@ -75,6 +75,7 @@ static int set_values(int argc, char** argv)
         else if (k == 2 && strncmp(argv[i], "sf", 2) == 0) { s.spreading_factor = (uint8_t)v; s.preset = LIBMESHCORE_PRESET_CUSTOM; }
         else if (k == 2 && strncmp(argv[i], "cr", 2) == 0) { s.coding_rate = (uint8_t)v; s.preset = LIBMESHCORE_PRESET_CUSTOM; }
         else if (k == 5 && strncmp(argv[i], "power", 5) == 0) s.tx_power_dbm = (int8_t)v;
+        else if (k == 8 && strncmp(argv[i], "pathhash", 8) == 0) s.path_hash_size = (uint8_t)v;
         else if (k == 7 && strncmp(argv[i], "enabled", 7) == 0) s.enabled = v != 0;
         else return -EINVAL;
     }
