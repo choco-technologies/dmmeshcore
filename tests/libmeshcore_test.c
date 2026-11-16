@@ -220,6 +220,25 @@ DMOD_TEST_STEP(service_without_a_radio)
     DMOD_TEST_EXPECT_EQ((int)libmeshcore_wait(st.serial, 60), (int)st.serial);
 }
 
+DMOD_TEST_STEP(a_link_adds_a_channel)
+{
+    char name[16], secret[48];
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_link_parse("Hi: meshcore://channel/add?name=MikiPatryk&secret=1300235ac2b1d82fa0300f9ce6ec0000 ok", name, sizeof(name), secret, sizeof(secret)), 0);
+    DMOD_TEST_EXPECT_TRUE(strcmp(name, "MikiPatryk") == 0 && strcmp(secret, "1300235ac2b1d82fa0300f9ce6ec0000") == 0);
+    /* the order of the parameters, a space of a name, a parameter that is not known */
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_link_parse("meshcore://channel/add?x=1&secret=izOH6cXN6mrJ5e26oRXNcg==&name=My%20Net+2", name, sizeof(name), secret, sizeof(secret)), 0);
+    DMOD_TEST_EXPECT_TRUE(strcmp(name, "My Net 2") == 0 && strcmp(secret, "izOH6cXN6mrJ5e26oRXNcg==") == 0);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_link_parse("no link here", name, sizeof(name), secret, sizeof(secret)), -ENOENT);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_link_parse("meshcore://channel/add?name=OnlyName", name, sizeof(name), secret, sizeof(secret)), -ENOENT);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_link_parse("meshcore://channel/add?name=AVeryLongNameOfAChannel&secret=00", name, sizeof(name), secret, sizeof(secret)), -ENOSPC);
+    /* the secret of the public channel is found; one that is not listened to is not */
+    uint8_t index = 9;
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_find("izOH6cXN6mrJ5e26oRXNcg==", &index), 0);
+    DMOD_TEST_EXPECT_EQ(index, 0);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_find("ffffffffffffffffffffffffffffffff", &index), -ENOENT);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_find("junk", &index), -EINVAL);
+}
+
 DMOD_TEST_STEP(channels_are_added_once)
 {
     char name[16];

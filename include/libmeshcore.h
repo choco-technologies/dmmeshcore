@@ -278,6 +278,16 @@ dmod_libmeshcore_api(1.0, int, _channel_add, ( const char* name, const char* sec
 /** @brief Stop listening to the channel `index` (not the public one, 0). 0, -EINVAL, -ENOENT. The texts that were heard stay. */
 dmod_libmeshcore_api(1.0, int, _channel_remove, ( uint8_t index ));
 
+/**
+ * @brief Find a link that adds a channel in a text: "meshcore://channel/add?name=Friends&secret=<32 hex digits or base64>" (what the apps of MeshCore share;
+ *        "%20" and "+" in the name are a space). `name` and `secret` get the values (as they are in the link: the secret is not checked, _channel_add does).
+ *        0; -ENOENT (no link in the text, or it has no name or no secret); -EINVAL; -ENOSPC (a value does not fit).
+ */
+dmod_libmeshcore_api(1.0, int, _channel_link_parse, ( const char* text, char* name, size_t name_size, char* secret, size_t secret_size ));
+
+/** @brief The index of the channel that has this secret (base64, 32 hex digits or a name with '#'), when it is listened to: 0 and `index`; -ENOENT; -EINVAL. */
+dmod_libmeshcore_api(1.0, int, _channel_find, ( const char* secret, uint8_t* index ));
+
 /** @brief The channels: `name` of the channel `index` (0 is the public one); -ENOENT when there is none. */
 dmod_libmeshcore_api(1.0, int, _channel_name, ( uint8_t index, char* name, size_t capacity, uint8_t* hash ));
 
