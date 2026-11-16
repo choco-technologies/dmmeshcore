@@ -25,7 +25,11 @@
 #define TEXT_ROWS       4u
 #define LINE_WIDTH      30u
 
-enum { PAGE_MAIN = 0, PAGE_NODES = 1, PAGE_TEXTS = 2 };
+#define COMPOSE_MAX     100u        /* the bytes of a text to send (the frame takes 184 bytes with the name of this node, the time and the padding of AES) */
+#define KEY_ENTER       0x28
+#define KEY_BACKSPACE   0x2A
+
+enum { PAGE_MAIN = 0, PAGE_NODES = 1, PAGE_TEXTS = 2, PAGE_COMPOSE = 3 };
 
 typedef struct
 {
@@ -34,6 +38,11 @@ typedef struct
     size_t      first;          /* the first row of the list that is shown */
     uint32_t    serial;
     uint32_t    shown_at;       /* when the page was drawn */
+    uint8_t     channel;        /* the channel a text is written to */
+    char        text[COMPOSE_MAX + 1];
+    char        status[40];     /* the line under the text: what happened to the last one */
+    int         utc_offset_min;
+    bool        eu_dst;
 } ui_t;
 
 static void set_int(const ui_t* ui, const char* name, int32_t value)
@@ -106,7 +115,7 @@ static void show_texts(const ui_t* ui)
 {
     libmeshcore_message_t messages[LIBMESHCORE_MAX_MESSAGES];
     size_t total = 0;
-    char name[24], l1[LINE_WIDTH + 4], l2[LINE_WIDTH + 4], who[48], info[32], age[16];
+    char name[24], l1[LINE_WIDTH + 4], l2[LINE_WIDTH + 4], who[56], info[32];
     (void)libmeshcore_messages(messages, LIBMESHCORE_MAX_MESSAGES, &total);
     size_t shown = 0;
     for (unsigned i = 0; i < TEXT_ROWS; i++)
@@ -118,8 +127,7 @@ static void show_texts(const ui_t* ui)
         if (!on)
             continue;
         shown++;
-        meshcore_age(messages[index].age_s, age, sizeof(age));
-        Dmod_SnPrintf(who, sizeof(who), "%s%s, %s ago", messages[index].mine ? "> " : "", messages[index].channel, age);
+        meshcore_who(&messages[index], ui->utc_offset_min, ui->eu_dst, who, sizeof(who));
         row_name(name, sizeof(name), "t", i, "who");
         set_text(ui, name, who);
         meshcore_wrap(messages[index].text, LINE_WIDTH, l1, l2, sizeof(l1));
@@ -132,10 +140,24 @@ static void show_texts(const ui_t* ui)
     set_text(ui, "texts.info", info);
 }
 
+static void show_compose(const ui_t* ui)
+{
+    char name[40], text[COMPOSE_MAX + 8];
+    if (libmeshcore_channel_name(ui->channel, name, sizeof(name), NULL) != 0)
+        Dmod_SnPrintf(name, sizeof(name), "?");
+    Dmod_SnPrintf(text, sizeof(text), "To: %s", name);
+    set_text(ui, "cp.to", text);
+    Dmod_SnPrintf(text, sizeof(text), "%s|", ui->text);
+    set_text(ui, "cp.text", text);
+    set_text(ui, "cp.status", ui->status);
+}
+
 static void show(ui_t* ui)
 {
     set_int(ui, "page", ui->page);
-    if (ui->page == PAGE_NODES)
+    if (ui->page == PAGE_COMPOSE)
+        show_compose(ui);
+    else if (ui->page == PAGE_NODES)
         show_nodes(ui);
     else if (ui->page == PAGE_TEXTS)
         show_texts(ui);
@@ -143,9 +165,95 @@ static void show(ui_t* ui)
         show_main(ui);
 }
 
+static void open_compose(ui_t* ui, const char* prefix)
+{
+    ui->page = PAGE_COMPOSE;
+    ui->channel = 0;
+    Dmod_SnPrintf(ui->text, sizeof(ui->text), "%s", prefix);
+    ui->status[0] = '\0';
+    show(ui);
+}
+
+/* A tap on a text: write to its channel, to its sender */
+static void reply_to(ui_t* ui, size_t index)
+{
+    libmeshcore_message_t messages[LIBMESHCORE_MAX_MESSAGES];
+    size_t total = 0;
+    char prefix[48];
+    (void)libmeshcore_messages(messages, LIBMESHCORE_MAX_MESSAGES, &total);
+    if (index >= total)
+        return;
+    meshcore_reply_prefix(messages[index].text, prefix, sizeof(prefix));
+    open_compose(ui, prefix);
+    for (uint8_t i = 0; i < LIBMESHCORE_MAX_CHANNELS; i++)
+    {
+        char name[LIBMESHCORE_CHANNEL_NAME_MAX + 1];
+        if (libmeshcore_channel_name(i, name, sizeof(name), NULL) == 0 && strcmp(name, messages[index].channel) == 0)
+        {
+            ui->channel = i;
+            break;
+        }
+    }
+    show(ui);
+}
+
+static void send_text(ui_t* ui)
+{
+    if (ui->text[0] == '\0')
+        return;
+    Dmod_SnPrintf(ui->status, sizeof(ui->status), "Sending...");
+    show(ui);                                                       /* (a send looks at the channel and takes seconds: the page says so first) */
+    int ret = libmeshcore_send_text(ui->channel, ui->text);
+    if (ret == 0)
+    {
+        ui->text[0] = '\0';
+        Dmod_SnPrintf(ui->status, sizeof(ui->status), "Sent");
+    }
+    else
+        Dmod_SnPrintf(ui->status, sizeof(ui->status), ret == -ENODEV ? "No radio" : ret == -EBUSY ? "The channel is busy, try again" : "Could not send (%d)", ret);
+    show(ui);
+}
+
+static void handle_compose(ui_t* ui, const libdmview_event_t* ev)
+{
+    if (strcmp(ev->name, "char") == 0)
+        (void)meshcore_append(ui->text, sizeof(ui->text), (uint32_t)ev->value);
+    else if (strcmp(ev->name, "key") == 0 && ev->value == KEY_BACKSPACE)
+        meshcore_backspace(ui->text);
+    else if ((strcmp(ev->name, "key") == 0 && ev->value == KEY_ENTER) || strcmp(ev->name, "send") == 0)
+    {
+        send_text(ui);
+        return;
+    }
+    else if (strcmp(ev->name, "back") == 0)
+    {
+        ui->page = PAGE_TEXTS;
+        ui->first = 0;
+    }
+    else
+        return;
+    ui->status[0] = '\0';
+    show(ui);
+}
+
 static void handle(ui_t* ui, const libdmview_event_t* ev)
 {
     size_t rows = ui->page == PAGE_NODES ? NODE_ROWS : TEXT_ROWS;
+    if (ui->page == PAGE_COMPOSE)
+    {
+        handle_compose(ui, ev);
+        return;
+    }
+    if (strcmp(ev->name, "new") == 0 && ui->page == PAGE_TEXTS)
+    {
+        open_compose(ui, "");
+        return;
+    }
+    if (strcmp(ev->name, "row") == 0 && ui->page == PAGE_TEXTS)
+    {
+        reply_to(ui, ui->first + (size_t)ev->value);
+        return;
+    }
     if (strcmp(ev->name, "open.nodes") == 0)
     {
         ui->page = PAGE_NODES;
@@ -218,6 +326,19 @@ int main(int argc, char* argv[])
 
     ui_t ui;
     memset(&ui, 0, sizeof(ui));
+    /* the local time: the same variables as the status bar of the phone, so that the times agree (60 = CET; the summer time of the EU unless PHONEUI_DST says off) */
+    const char* offset = Dmod_GetEnv("PHONEUI_UTC_OFFSET");
+    const char* dst = Dmod_GetEnv("PHONEUI_DST");
+    ui.utc_offset_min = 60;
+    if (offset != NULL && offset[0] != '\0')
+    {
+        bool negative = offset[0] == '-';
+        int value = 0;
+        for (const char* c = offset + (negative ? 1 : 0); *c >= '0' && *c <= '9'; c++)
+            value = value * 10 + (*c - '0');
+        ui.utc_offset_min = negative ? -value : value;
+    }
+    ui.eu_dst = dst == NULL || dst[0] == '\0' || dst[0] == 'e' || dst[0] == 'E';
     int ret = claim_display(display, view, &ui.claim);
     if (ret != 0)
     {

@@ -91,3 +91,123 @@ void meshcore_range(size_t first, size_t shown, size_t total, char* out, size_t 
     else
         Dmod_SnPrintf(out, size, "%u-%u of %u", (unsigned)(first + 1u), (unsigned)(first + shown), (unsigned)total);
 }
+
+/* ---- The time ---- */
+
+static int64_t days_from_civil(int year, unsigned month, unsigned day)
+{
+    int64_t y = year - (month <= 2 ? 1 : 0);
+    int64_t era = (y >= 0 ? y : y - 399) / 400;
+    unsigned yoe = (unsigned)(y - era * 400);
+    unsigned doy = (153 * (month > 2 ? month - 3 : month + 9) + 2) / 5 + day - 1;
+    unsigned doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    return era * 146097 + (int64_t)doe - 719468;
+}
+
+static int year_of(int64_t days)
+{
+    int64_t z = days + 719468;
+    int64_t era = (z >= 0 ? z : z - 146096) / 146097;
+    unsigned doe = (unsigned)(z - era * 146097);
+    unsigned yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    unsigned doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    unsigned mp = (5 * doy + 2) / 153;
+    return (int)((int64_t)yoe + era * 400 + (mp >= 10 ? 1 : 0));
+}
+
+/* 01:00 UTC of the last Sunday of a month of 31 days */
+static int64_t last_sunday_01utc(int year, unsigned month)
+{
+    int64_t last = days_from_civil(year, month, 31);
+    unsigned weekday = (unsigned)((last % 7 + 7 + 4) % 7);          /* 1970-01-01 was a Thursday; 0 = Sunday */
+    return (last - weekday) * 86400 + 3600;
+}
+
+void meshcore_clock(uint32_t utc_seconds, int offset_min, bool eu_dst, char* out, size_t size)
+{
+    if (utc_seconds == 0u)
+    {
+        Dmod_SnPrintf(out, size, "--:--");
+        return;
+    }
+    int64_t utc = utc_seconds;
+    int64_t local = utc + (int64_t)offset_min * 60;
+    if (eu_dst)
+    {
+        int year = year_of(utc / 86400);
+        if (utc >= last_sunday_01utc(year, 3) && utc < last_sunday_01utc(year, 10))
+            local += 3600;
+    }
+    int64_t rest = local % 86400;
+    if (rest < 0)
+        rest += 86400;
+    Dmod_SnPrintf(out, size, "%02u:%02u", (unsigned)(rest / 3600), (unsigned)(rest % 3600 / 60));
+}
+
+void meshcore_who(const libmeshcore_message_t* message, int offset_min, bool eu_dst, char* out, size_t size)
+{
+    char clock[8];
+    const char* mine = message->mine ? "> " : "";
+    if (message->heard_utc != 0u)
+    {
+        meshcore_clock(message->heard_utc, offset_min, eu_dst, clock, sizeof(clock));
+        Dmod_SnPrintf(out, size, "%s%s, %s, %u hop%s", mine, message->channel, clock, (unsigned)message->hops, message->hops == 1 ? "" : "s");
+    }
+    else
+        Dmod_SnPrintf(out, size, "%s%s, %u hop%s", mine, message->channel, (unsigned)message->hops, message->hops == 1 ? "" : "s");
+}
+
+void meshcore_reply_prefix(const char* text, char* out, size_t size)
+{
+    out[0] = '\0';
+    const char* colon = text;
+    while (*colon != '\0' && !(colon[0] == ':' && colon[1] == ' '))      /* (no strstr in a module) */
+        colon++;
+    if (*colon == '\0' || colon == text || (size_t)(colon - text) + 5u > size)
+        return;
+    Dmod_SnPrintf(out, size, "@[%.*s] ", (int)(colon - text), text);
+}
+
+bool meshcore_append(char* text, size_t capacity, uint32_t codepoint)
+{
+    char utf8[4];
+    size_t n;
+    if (codepoint < 0x20u || codepoint == 0x7Fu)
+        return false;
+    if (codepoint < 0x80u)
+    {
+        utf8[0] = (char)codepoint;
+        n = 1;
+    }
+    else if (codepoint < 0x800u)
+    {
+        utf8[0] = (char)(0xC0u | (codepoint >> 6));
+        utf8[1] = (char)(0x80u | (codepoint & 0x3Fu));
+        n = 2;
+    }
+    else if (codepoint < 0x10000u)
+    {
+        utf8[0] = (char)(0xE0u | (codepoint >> 12));
+        utf8[1] = (char)(0x80u | ((codepoint >> 6) & 0x3Fu));
+        utf8[2] = (char)(0x80u | (codepoint & 0x3Fu));
+        n = 3;
+    }
+    else
+        return false;
+    size_t length = strlen(text);
+    if (length + n + 1u > capacity)
+        return false;
+    memcpy(text + length, utf8, n);
+    text[length + n] = '\0';
+    return true;
+}
+
+void meshcore_backspace(char* text)
+{
+    size_t length = strlen(text);
+    while (length > 0u && ((unsigned char)text[length - 1u] & 0xC0u) == 0x80u)
+        length--;                                                   /* the continuation bytes of the last character */
+    if (length > 0u)
+        length--;
+    text[length] = '\0';
+}

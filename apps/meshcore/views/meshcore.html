@@ -27,6 +27,19 @@ body { font-size: 14px; line-height: 1.2; }
 .row { position: absolute; left: 0; width: 240px; background: #fff; }
 .row:active { background: #000; color: #fff; }
 
+/* the texts of the rows are at the left (the converter centers a text that is set later when the alignment is not said) */
+.item .nm, .item .sub, .msg .who, .msg .l1, .msg .l2, #st-title, #st-line1, #st-line2, #st-line3 { text-align: left; }
+
+/* a text to write */
+#cp-to { position: absolute; left: 12px; top: 38px; width: 216px; font-size: 14px; font-weight: 700; }
+#cp-field { position: absolute; left: 10px; top: 60px; width: 220px; height: 112px; border: 2px solid #000; border-radius: 6px; overflow: hidden; }
+#cp-text { position: absolute; left: 6px; top: 5px; width: 204px; font-size: 14px; line-height: 17px; white-space: normal; word-wrap: break-word; text-align: left; }
+#cp-hint { position: absolute; left: 12px; top: 178px; width: 216px; font-size: 12px; text-align: left; }
+#cp-status { position: absolute; left: 12px; top: 196px; width: 216px; font-size: 13px; font-weight: 700; text-align: left; }
+#cp-send { left: 70px; top: 224px; width: 100px; height: 34px; line-height: 30px; background: #000; color: #fff; }
+#cp-send:active { background: #fff; color: #000; }
+.hdr .new { position: absolute; right: 0; top: 0; width: 44px; height: 30px; font-size: 24px; font-weight: 700; text-align: center; line-height: 26px; }
+
 /* the main page */
 #st-title { position: absolute; left: 12px; top: 40px; width: 216px; font-size: 18px; font-weight: 700; }
 #st-line1 { position: absolute; left: 12px; top: 68px; width: 216px; font-size: 13px; }
@@ -74,12 +87,21 @@ body { font-size: 14px; line-height: 1.2; }
 </div>
 
 <div class="page" id="texts">
-  <div class="hdr"><div class="back" id="texts-back">&lt;</div><div class="name">Messages</div><div class="rule"></div></div>
+  <div class="hdr"><div class="back" id="texts-back">&lt;</div><div class="name">Messages</div><div class="new" id="texts-new">+</div><div class="rule"></div></div>
   <div class="row msg" id="t0"><div class="who nowrap" id="t0-who">Public</div><div class="l1 nowrap" id="t0-l1">text</div><div class="l2 nowrap" id="t0-l2">text</div></div>
   <div class="row msg" id="t1"><div class="who nowrap" id="t1-who">Public</div><div class="l1 nowrap" id="t1-l1">text</div><div class="l2 nowrap" id="t1-l2">text</div></div>
   <div class="row msg" id="t2"><div class="who nowrap" id="t2-who">Public</div><div class="l1 nowrap" id="t2-l1">text</div><div class="l2 nowrap" id="t2-l2">text</div></div>
   <div class="row msg" id="t3"><div class="who nowrap" id="t3-who">Public</div><div class="l1 nowrap" id="t3-l1">text</div><div class="l2 nowrap" id="t3-l2">text</div></div>
   <div class="btn pg" id="prev-t">&lt;</div><div class="info nowrap" id="texts-info">1-4 of 7</div><div class="btn pg" id="next-t">&gt;</div>
+</div>
+
+<div class="page" id="compose">
+  <div class="hdr"><div class="back" id="cp-back">&lt;</div><div class="name">Message</div><div class="rule"></div></div>
+  <div id="cp-to" class="nowrap">To: Public</div>
+  <div id="cp-field"><div id="cp-text">|</div></div>
+  <div id="cp-hint" class="nowrap">Type the text, Enter sends</div>
+  <div id="cp-status" class="nowrap"></div>
+  <div class="btn" id="cp-send">Send</div>
 </div>
 
 </div>
@@ -90,7 +112,7 @@ body { font-size: 14px; line-height: 1.2; }
  * comes from properties that the application sets (dmod.prop), what the user does goes to the application as events (dmod.emit) - src/main.c is on
  * the other side. The names are the contract (docs/gui.md).
  */
-const pages = [document.getElementById('main'), document.getElementById('nodes'), document.getElementById('texts')];
+const pages = [document.getElementById('main'), document.getElementById('nodes'), document.getElementById('texts'), document.getElementById('compose')];
 function shown(el, on) { if (on) el.classList.remove('hidden'); else el.classList.add('hidden'); }
 
 /* Every character the application may send: the font of the view has only the characters of the page and of its scripts */
@@ -118,6 +140,19 @@ document.getElementById('open-nodes').addEventListener('click', () => dmod.emit(
 document.getElementById('open-texts').addEventListener('click', () => dmod.emit('open.texts'));
 document.getElementById('nodes-back').addEventListener('click', () => dmod.emit('back'));
 document.getElementById('texts-back').addEventListener('click', () => dmod.emit('back'));
+document.getElementById('texts-new').addEventListener('click', () => dmod.emit('new'));
+document.getElementById('cp-back').addEventListener('click', () => dmod.emit('back'));
+document.getElementById('cp-send').addEventListener('click', () => dmod.emit('send'));
+dmod.prop('cp.to', 'To: Public');
+dmod.prop('cp.text', '|');
+dmod.prop('cp.hint', 'Type the text, Enter sends');
+dmod.prop('cp.status', '');
+const cpTo = document.getElementById('cp-to'), cpText = document.getElementById('cp-text'), cpHint = document.getElementById('cp-hint'),
+      cpStatus = document.getElementById('cp-status');
+dmod.onchange('cp.to', () => cpTo.innerText = dmod.get('cp.to'));
+dmod.onchange('cp.text', () => cpText.innerText = dmod.get('cp.text'));
+dmod.onchange('cp.hint', () => cpHint.innerText = dmod.get('cp.hint'));
+dmod.onchange('cp.status', () => cpStatus.innerText = dmod.get('cp.status'));
 document.getElementById('prev-n').addEventListener('click', () => dmod.emit('prev'));
 document.getElementById('next-n').addEventListener('click', () => dmod.emit('next'));
 document.getElementById('prev-t').addEventListener('click', () => dmod.emit('prev'));
@@ -147,6 +182,7 @@ for (let i = 0; i < 4; i++) {
     dmod.onchange('t' + i + '.l1', () => l1.innerText = dmod.get('t' + i + '.l1'));
     dmod.onchange('t' + i + '.l2', () => l2.innerText = dmod.get('t' + i + '.l2'));
     dmod.onchange('t' + i + '.on', () => shown(row, dmod.get('t' + i + '.on')));
+    row.addEventListener('click', () => dmod.emit('row', i));
 }
 dmod.prop('texts.info', '');
 const textsInfo = document.getElementById('texts-info');

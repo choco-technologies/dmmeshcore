@@ -222,11 +222,12 @@ typedef struct
 typedef struct
 {
     uint32_t    timestamp;                  /**< By the clock of the sender. */
+    uint32_t    heard_utc;                  /**< When it was heard: seconds since 1970 (UTC) by the clock of this node; 0 when the clock was not set (yet). */
     uint32_t    age_s;                      /**< Seconds since it was heard. */
     char        channel[LIBMESHCORE_CHANNEL_NAME_MAX + 1];
     char        text[LIBMESHCORE_MESSAGE_TEXT_MAX + 1];     /**< "sender: message". */
     int16_t     rssi_dbm;
-    uint8_t     hops;
+    uint8_t     hops;                       /**< The hops it made (the repeaters in its path); of a text heard twice - the fewer. */
     bool        mine;                       /**< Sent by this node. */
 } libmeshcore_message_t;
 

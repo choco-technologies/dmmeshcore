@@ -148,12 +148,35 @@ static void note_contact(const libmeshcore_packet_t* packet, const libmeshcore_a
     slot->heard_ms = now;
 }
 
-static void note_message(const channel_slot_t* channel, const libmeshcore_group_text_t* text, const libmeshcore_packet_t* packet, int16_t rssi,
+/* The time now in seconds since 1970 by the clock of the node (dmutc), 0 when it is not set */
+static uint32_t utc_now(void)
+{
+    dmutc_time_t utc;
+    return (dmutc_get(&utc) == 0 && utc.seconds > 0) ? (uint32_t)utc.seconds : 0u;
+}
+
+/* true when the text is new (a copy of one that is kept is not) */
+static bool note_message(const channel_slot_t* channel, const libmeshcore_group_text_t* text, const libmeshcore_packet_t* packet, int16_t rssi,
                          uint32_t now, bool mine)
 {
+    /* A flood reaches a node more than once (through other repeaters): the same text of the same channel with the same time of the sender is one message */
+    for (unsigned i = 0; i < g.message_count; i++)
+    {
+        const message_t* old = &g.messages[i];
+        if (old->info.timestamp == text->timestamp && strcmp(old->info.channel, channel->name) == 0 && strcmp(old->info.text, text->text) == 0)
+        {
+            if (packet->hash_count < g.messages[i].info.hops)       /* the copy that came the shortest way says how far the sender is */
+            {
+                g.messages[i].info.hops = packet->hash_count;
+                g.messages[i].info.rssi_dbm = rssi;
+            }
+            return false;
+        }
+    }
     message_t* m = &g.messages[g.message_next];
     memset(m, 0, sizeof(*m));
     m->info.timestamp = text->timestamp;
+    m->info.heard_utc = utc_now();
     Dmod_SnPrintf(m->info.channel, sizeof(m->info.channel), "%s", channel->name);
     Dmod_SnPrintf(m->info.text, sizeof(m->info.text), "%s", text->text);
     m->info.rssi_dbm = rssi;
@@ -163,6 +186,7 @@ static void note_message(const channel_slot_t* channel, const libmeshcore_group_
     g.message_next = (uint8_t)((g.message_next + 1U) % LIBMESHCORE_MAX_MESSAGES);
     if (g.message_count < LIBMESHCORE_MAX_MESSAGES)
         g.message_count++;
+    return true;
 }
 
 static void note_log(const libmeshcore_packet_t* packet, uint8_t length, int16_t rssi, int16_t snr_dbx4, uint32_t now)
@@ -214,8 +238,8 @@ static void take_frame(const dmdrvi_lora_frame_t* frame)
             libmeshcore_group_text_t text;
             if (libmeshcore_group_text_decode(&ch->channel, &packet, &text) == 0)
             {
-                note_message(ch, &text, &packet, frame->rssi_dbm, now, false);
-                g.texts++;
+                if (note_message(ch, &text, &packet, frame->rssi_dbm, now, false))
+                    g.texts++;
                 break;
             }
         }
