@@ -33,6 +33,9 @@ jobs:
           test -f build/dmf/libmeshcore.dmf
           test -f build/dmf/libmeshcore_version.txt
           test -f build/dmf/test_libmeshcore.dmf
+          test -f build/dmf/meshcore.dmf
+          test -f build/dmf/mesh.dmf
+          test -f build/dmf/test_meshcore.dmf
           echo "Module files present"
 
       - name: Run tests with dmod_loader
@@ -40,3 +43,5 @@ jobs:
           export DMOD_DMF_DIR=$(pwd)/build/dmf
           dmf-get install -d ${DMOD_DMF_DIR}/test_libmeshcore-local.dmd -y
           dmod_loader build/dmf/test_libmeshcore.dmf
+          dmf-get install -d ${DMOD_DMF_DIR}/test_meshcore-local.dmd -y
+          dmod_loader build/dmf/test_meshcore.dmf
