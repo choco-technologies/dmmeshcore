@@ -36,6 +36,7 @@
 #define FULL_WIDTH      24u         /* the bytes of a line of the full-screen field (it shows six) */
 #define FULL_LINES      6u
 #define EDIT_LINES      8u          /* the lines of a text of COMPOSE_MAX bytes, at most */
+#define LINK_SECRET_MAX 64u
 #define NAME_TYPED_MAX  (LIBMESHCORE_CHANNEL_NAME_MAX + 8u)
 #define KEY_TYPED_MAX   48u
 #define FIELD_SHOWN     26u         /* the bytes of a single-line field that are shown (its end) */
@@ -233,9 +234,22 @@ static size_t build_rows(ui_t* ui)
         if (strcmp(message->channel, channel) != 0)
             continue;
         meshcore_split_sender(message->text, sender, sizeof(sender), &body);
-        size_t n = meshcore_wrap_lines(body, BUBBLE_WIDTH, &lines[0][0], ROW_TEXT, BUBBLE_LINES);
-        if (n == 0u)
-            n = 1u, lines[0][0] = '\0';
+        size_t n;
+        char link_name[LIBMESHCORE_CHANNEL_NAME_MAX + 1], link_secret[LINK_SECRET_MAX];
+        uint8_t known;
+        if (libmeshcore_channel_link_parse(body, link_name, sizeof(link_name), link_secret, sizeof(link_secret)) == 0)
+        {
+            /* a link that adds a channel: what it is and what a tap does (the link itself is a line of a code nobody reads) */
+            Dmod_SnPrintf(lines[0], ROW_TEXT, "Channel %s", link_name);
+            Dmod_SnPrintf(lines[1], ROW_TEXT, libmeshcore_channel_find(link_secret, &known) == 0 ? "Tap to open it" : "Tap to add it");
+            n = 2u;
+        }
+        else
+        {
+            n = meshcore_wrap_lines(body, BUBBLE_WIDTH, &lines[0][0], ROW_TEXT, BUBBLE_LINES);
+            if (n == 0u)
+                n = 1u, lines[0][0] = '\0';
+        }
         meshcore_bubble_head(message, sender, ui->utc_offset_min, ui->eu_dst, head, sizeof(head));
         add_row(ui, &count, 0, message->mine, (int16_t)(m - 1u), head);
         for (size_t l = 0; l < n; l++)
@@ -479,10 +493,38 @@ static void open_chat(ui_t* ui, uint8_t channel)
     show(ui);
 }
 
-/* A tap on a line of a bubble of somebody else: the text begins with "@[Sender] " */
+/* A tap on a bubble with a link that adds a channel: the channel is added (it is there already: opened) and its chat is shown. false when the text has no link */
+static bool open_linked_channel(ui_t* ui, const libmeshcore_message_t* message)
+{
+    char sender[LIBMESHCORE_NODE_NAME_MAX + 2], name[LIBMESHCORE_CHANNEL_NAME_MAX + 1], secret[LINK_SECRET_MAX];
+    const char* body;
+    uint8_t index;
+    meshcore_split_sender(message->text, sender, sizeof(sender), &body);
+    if (libmeshcore_channel_link_parse(body, name, sizeof(name), secret, sizeof(secret)) != 0)
+        return false;
+    int ret = libmeshcore_channel_find(secret, &index);
+    if (ret != 0)
+    {
+        ret = libmeshcore_channel_add(name, secret);
+        if (ret == 0)
+            ret = libmeshcore_channel_find(secret, &index);
+    }
+    if (ret == 0)
+    {
+        open_chat(ui, index);
+        return true;
+    }
+    Dmod_SnPrintf(ui->status, sizeof(ui->status), ret == -ENOSPC ? "No place for more channels" : ret == -EINVAL ? "Not a key: 24 base64 or 32 hex" : "Could not add (%d)", ret);
+    show(ui);
+    return true;
+}
+
+/* A tap on a line of a bubble of somebody else: the text begins with "@[Sender] " (a bubble with a link that adds a channel adds it instead) */
 static void reply_to(ui_t* ui, unsigned row)
 {
-    if (row >= CHAT_ROWS || ui->row_message[row] < 0 || ui->messages[ui->row_message[row]].mine)
+    if (row >= CHAT_ROWS || ui->row_message[row] < 0)
+        return;
+    if (open_linked_channel(ui, &ui->messages[ui->row_message[row]]) || ui->messages[ui->row_message[row]].mine)
         return;
     char sender[LIBMESHCORE_NODE_NAME_MAX + 2];
     const char* body;
