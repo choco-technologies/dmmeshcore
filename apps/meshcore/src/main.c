@@ -541,7 +541,7 @@ static void add_channel(ui_t* ui)
             }
         }
     }
-    Dmod_SnPrintf(ui->status, sizeof(ui->status), ret == -ENOSPC ? "No place for more channels" : ret == -EINVAL ? "That is not a key" : "Could not add (%d)", ret);
+    Dmod_SnPrintf(ui->status, sizeof(ui->status), ret == -ENOSPC ? "No place for more channels" : ret == -EINVAL ? "Not a key: 24 base64 or 32 hex" : "Could not add (%d)", ret);
     show(ui);
 }
 
