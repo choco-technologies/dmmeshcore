@@ -1,0 +1,7 @@
+set(DMOD_MODULE_NAME mesh)
+set(DMOD_MODULE_VERSION ${PROJECT_VERSION})
+set(DMOD_AUTHOR_NAME "Patryk Kubiak")
+set(DMOD_STACK_SIZE 4096)
+set(DMOD_DMR_PATH ${CMAKE_CURRENT_SOURCE_DIR}/mesh.dmr)
+dmod_add_executable(mesh ${DMOD_MODULE_VERSION} mesh.c)
+target_link_libraries(mesh libmeshcore_if)
