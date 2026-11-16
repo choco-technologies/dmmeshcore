@@ -5,6 +5,7 @@
 #include "dmdrvi_ioctl.h"
 #include "dmosi.h"
 #include "dmutc.h"
+#include "dmnotify_ioctl.h"
 #include <errno.h>
 #include <string.h>
 
@@ -18,6 +19,10 @@
 #define IDLE_WAIT_MS        300u
 #define SEND_TRIES          5u
 #define PATH_MAX_LENGTH     63
+/* The notifications of the system (dmnotify): a text that is heard is told there. The source is the name of the application the user opens to
+ * read it (a tap on the notification starts the module of that name), and the channel of the notification is the index of the channel of the mesh. */
+#define NOTIFY_NODE         "/dev/notify"
+#define NOTIFY_SOURCE       "meshcore"
 
 typedef struct
 {
@@ -67,6 +72,12 @@ static struct
     log_t                   log[LIBMESHCORE_MAX_PACKETS];
     uint8_t                 log_count, log_next;
     channel_slot_t          channels[LIBMESHCORE_MAX_CHANNELS];
+    uint16_t                unread[LIBMESHCORE_MAX_CHANNELS];   /* the texts of others heard since the channel was seen (libmeshcore_channel_seen()) */
+    dmosi_mutex_t           notify_lock;        /* guards the file of the notification node (the worker notifies, a client cancels) */
+    void*                   notify_node;        /* open for writing; NULL until the node is there */
+    /* what the worker notifies about, copied under the lock and told after it is released (the subscribers are called in the ioctl) */
+    char                    notify_brief[LIBMESHCORE_CHANNEL_NAME_MAX + 12];
+    char                    notify_text[LIBMESHCORE_MESSAGE_TEXT_MAX + 1];
 } g;
 
 static void changed(void)                                   /* the lock is held */
@@ -210,10 +221,51 @@ static void note_log(const libmeshcore_packet_t* packet, uint8_t length, int16_t
         g.log_count++;
 }
 
+/* ---- The notifications ---- */
+
+/* Tell the notification node (a system without one - no dmnotify, no node yet - is not told: the texts are in the application all the same) */
+static void notify_ioctl(int command, const char* brief, const char* text, uint8_t channel)
+{
+    if (g.notify_lock == NULL)
+        return;
+    dmnotify_notification_t notification;
+    memset(&notification, 0, sizeof(notification));
+    notification.brief = brief;
+    notification.message = text;
+    notification.source = NOTIFY_SOURCE;
+    notification.privacy = dmnotify_privacy_private_message;    /* who writes where can be seen on a locked screen, what - cannot */
+    notification.channel = channel;
+    dmosi_mutex_lock(g.notify_lock);
+    if (g.notify_node == NULL)
+        g.notify_node = Dmod_FileOpen(NOTIFY_NODE, "w");
+    if (g.notify_node != NULL)
+        (void)Dmod_Ioctl(g.notify_node, command, &notification);
+    dmosi_mutex_unlock(g.notify_lock);
+}
+
+/* The lock is held: what the notification of a channel says now is copied for the worker to tell */
+static void notify_prepare_locked(unsigned index, const char* text)
+{
+    if (g.unread[index] < UINT16_MAX)
+        g.unread[index]++;
+    if (g.unread[index] > 1u)
+        Dmod_SnPrintf(g.notify_brief, sizeof(g.notify_brief), "%s (%u)", g.channels[index].name, (unsigned)g.unread[index]);
+    else
+        Dmod_SnPrintf(g.notify_brief, sizeof(g.notify_brief), "%s", g.channels[index].name);
+    Dmod_SnPrintf(g.notify_text, sizeof(g.notify_text), "%s", text);
+}
+
+/* The channel has nothing unread anymore: its notification goes (the lock is not held) */
+static void notify_cancel(uint8_t index)
+{
+    notify_ioctl(DMNOTIFY_IOCTL_CMD_CANCEL, NULL, NULL, index);
+}
+
 static void take_frame(const dmdrvi_lora_frame_t* frame)
 {
     libmeshcore_packet_t packet;
     uint32_t now = Dmod_GetUptime();
+    int notify = -1;                                        /* the channel a new text of somebody else came on */
     dmosi_mutex_lock(g.lock);
     g.last_rssi = frame->rssi_dbm;
     if (libmeshcore_packet_decode(frame->data, frame->length, &packet) != 0)
@@ -242,13 +294,19 @@ static void take_frame(const dmdrvi_lora_frame_t* frame)
             if (libmeshcore_group_text_decode(&ch->channel, &packet, &text) == 0)
             {
                 if (note_message(ch, &text, &packet, frame->rssi_dbm, now, false))
+                {
                     g.texts++;
+                    notify = (int)(ch - g.channels);
+                    notify_prepare_locked((unsigned)notify, text.text);
+                }
                 break;
             }
         }
     }
     changed();
     dmosi_mutex_unlock(g.lock);
+    if (notify >= 0)                                        /* (notify_brief and notify_text are written by this thread only) */
+        notify_ioctl(DMNOTIFY_IOCTL_CMD_NOTIFY, g.notify_brief, g.notify_text, (uint8_t)notify);
 }
 
 /* ---- The worker ---- */
@@ -643,14 +701,47 @@ dmod_libmeshcore_api_declaration(1.0, int, _channel_remove, ( uint8_t index ))
     dmosi_mutex_lock(g.lock);
     ensure_channels_loaded_locked();
     int ret = g.channels[index].used ? 0 : -ENOENT;
+    bool unread = g.unread[index] > 0u;
     if (ret == 0)
     {
         memset(&g.channels[index], 0, sizeof(g.channels[index]));
+        g.unread[index] = 0;
         changed();
     }
     dmosi_mutex_unlock(g.lock);
     if (ret == 0)
         save_channels();
+    if (ret == 0 && unread)
+        notify_cancel(index);
+    return ret;
+}
+
+dmod_libmeshcore_api_declaration(1.0, int, _channel_unread, ( uint8_t index, uint16_t* count ))
+{
+    if (index >= LIBMESHCORE_MAX_CHANNELS || count == NULL || g.lock == NULL)
+        return -EINVAL;
+    dmosi_mutex_lock(g.lock);
+    int ret = g.channels[index].used ? 0 : -ENOENT;
+    *count = ret == 0 ? g.unread[index] : 0u;
+    dmosi_mutex_unlock(g.lock);
+    return ret;
+}
+
+dmod_libmeshcore_api_declaration(1.0, int, _channel_seen, ( uint8_t index ))
+{
+    if (index >= LIBMESHCORE_MAX_CHANNELS || g.lock == NULL)
+        return -EINVAL;
+    dmosi_mutex_lock(g.lock);
+    int ret = g.channels[index].used ? 0 : -ENOENT;
+    bool unread = ret == 0 && g.unread[index] > 0u;
+    if (unread)
+    {
+        g.unread[index] = 0;
+        changed();
+    }
+    dmosi_mutex_unlock(g.lock);
+    if (unread)
+        notify_cancel(index);
     return ret;
 }
 
@@ -785,9 +876,13 @@ int dmod_init( const Dmod_Config_t* Config )
     strcpy(g.channels[0].name, "Public");
     (void)libmeshcore_channel_from_text(&g.channels[0].channel, "izOH6cXN6mrJ5e26oRXNcg==");
     g.channels[0].used = true;
+    g.notify_lock = dmosi_mutex_create(false);              /* (without it there are no notifications, the rest works) */
     g.worker = dmosi_thread_create(worker_main, NULL, 2, 6144, "meshcore", dmosi_process_current());
     if (g.worker == NULL)
     {
+        if (g.notify_lock != NULL)
+            dmosi_mutex_destroy(g.notify_lock);
+        g.notify_lock = NULL;
         dmosi_mutex_destroy(g.lock);
         g.lock = NULL;
         return -ENOMEM;
@@ -806,6 +901,16 @@ int dmod_deinit( void )
         dmosi_thread_destroy(g.worker);
         g.worker = NULL;
     }
+    /* what was notified about cannot be read anymore: the notifications go with the library */
+    for (uint8_t i = 0; i < LIBMESHCORE_MAX_CHANNELS; i++)
+        if (g.unread[i] > 0u)
+            notify_cancel(i);
+    if (g.notify_node != NULL)
+        Dmod_FileClose(g.notify_node);
+    g.notify_node = NULL;
+    if (g.notify_lock != NULL)
+        dmosi_mutex_destroy(g.notify_lock);
+    g.notify_lock = NULL;
     dmosi_mutex_destroy(g.lock);
     g.lock = NULL;
     return 0;

@@ -293,6 +293,17 @@ dmod_libmeshcore_api(1.0, int, _channel_find, ( const char* secret, uint8_t* ind
 dmod_libmeshcore_api(1.0, int, _channel_name, ( uint8_t index, char* name, size_t capacity, uint8_t* hash ));
 
 /**
+ * @brief How many texts of others were heard on the channel `index` since it was seen (libmeshcore_channel_seen()). 0, -ENOENT, -EINVAL.
+ *
+ * A text of somebody else is also a notification of the system, when there is the notification node (dmnotify, /dev/notify): one for each
+ * channel, of the source "meshcore" - the name of the channel (with the number of the unread texts when there are more) and the last text.
+ */
+dmod_libmeshcore_api(1.0, int, _channel_unread, ( uint8_t index, uint16_t* count ));
+
+/** @brief The user has seen the texts of the channel `index` (its chat is on the screen): nothing is unread, its notification is taken back. 0, -ENOENT, -EINVAL. */
+dmod_libmeshcore_api(1.0, int, _channel_seen, ( uint8_t index ));
+
+/**
  * @brief Send a text to a channel (a flood; the text goes as "<name of this node>: <text>"). It looks at the channel first (CAD: if somebody
  *        sends it waits a little and tries again). 0, -ENODEV (no radio), -EINVAL, -ENOENT (no such channel), -EBUSY (the channel stays busy), or the
  *        error of the radio.

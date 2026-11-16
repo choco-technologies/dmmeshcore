@@ -377,6 +377,7 @@ static void show_chat(ui_t* ui)
 {
     char name[24], title[LIBMESHCORE_CHANNEL_NAME_MAX + 1];
     size_t total = build_rows(ui);
+    (void)libmeshcore_channel_seen(ui->channel);            /* its texts are on the screen: the notification of the channel goes */
     size_t most = total > CHAT_ROWS ? total - CHAT_ROWS : 0u;
     if (ui->scroll > most)
         ui->scroll = most;

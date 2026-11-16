@@ -226,6 +226,19 @@ DMOD_TEST_STEP(service_without_a_radio)
     DMOD_TEST_EXPECT_EQ((int)libmeshcore_wait(st.serial, 60), (int)st.serial);
 }
 
+DMOD_TEST_STEP(nothing_is_unread_on_a_channel_nothing_was_heard_on)
+{
+    uint16_t unread = 99;
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_unread(0, &unread), 0);
+    DMOD_TEST_EXPECT_EQ((int)unread, 0);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_seen(0), 0);                    /* (no notification node here: nothing to take back) */
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_unread(LIBMESHCORE_MAX_CHANNELS - 1, &unread), -ENOENT);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_seen(LIBMESHCORE_MAX_CHANNELS - 1), -ENOENT);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_unread(LIBMESHCORE_MAX_CHANNELS, &unread), -EINVAL);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_seen(LIBMESHCORE_MAX_CHANNELS), -EINVAL);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_channel_unread(0, NULL), -EINVAL);
+}
+
 DMOD_TEST_STEP(a_link_adds_a_channel)
 {
     char name[16], secret[48];

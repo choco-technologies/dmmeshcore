@@ -97,6 +97,7 @@ dmod_link_modules(${DMOD_MODULE_NAME}
     dmini
     dmcrypto
     dmutc
+    dmnotify
 )
 
 enable_testing()
