@@ -186,6 +186,7 @@ typedef struct
     uint8_t     spreading_factor;
     uint8_t     coding_rate;
     int8_t      tx_power_dbm;
+    uint8_t     path_hash_size;             /**< The bytes of a hash in the path of what this node sends (1..3): the repeaters add their hashes of this size. */
     char        name[LIBMESHCORE_NODE_NAME_MAX + 1];    /**< The name of this node in the mesh. */
 } libmeshcore_settings_t;
 

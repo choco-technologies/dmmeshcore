@@ -721,6 +721,7 @@ dmod_libmeshcore_api_declaration(1.0, int, _send_text, ( uint8_t channel_index, 
     char name[LIBMESHCORE_NODE_NAME_MAX + 1];
     strcpy(path, g.path);
     strcpy(name, g.settings.name);
+    uint8_t hash_size = g.settings.path_hash_size;
     dmosi_mutex_unlock(g.lock);
 
     libmeshcore_group_text_t group;
@@ -730,7 +731,7 @@ dmod_libmeshcore_api_declaration(1.0, int, _send_text, ( uint8_t channel_index, 
     libmeshcore_packet_t packet;
     memset(&packet, 0, sizeof(packet));
     packet.route = LIBMESHCORE_ROUTE_FLOOD;
-    packet.hash_size = 1;
+    packet.hash_size = hash_size >= 1u && hash_size <= 3u ? hash_size : 1u;
     int ret = libmeshcore_group_text_encode(&channel.channel, &group, &packet);
     if (ret != 0)
         return ret;
