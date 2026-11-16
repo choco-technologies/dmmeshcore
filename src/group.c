@@ -179,3 +179,75 @@ dmod_libmeshcore_api_declaration(1.0, int, _group_text_encode, ( const libmeshco
     packet->payload_length = (uint8_t)(1u + LIBMESHCORE_MAC_SIZE + cipher);
     return 0;
 }
+
+/* ---- The link that adds a channel ---- */
+
+#define CHANNEL_LINK    "meshcore://channel/add?"
+
+static int hex_digit(char c)
+{
+    return hex_value(c);
+}
+
+/* A value of the link up to '&' or a space, with "%20" and "+" decoded, into out; false when it does not fit */
+static bool link_value(const char* from, char* out, size_t size, const char** end)   /* out may be NULL: the value is skipped */
+{
+    size_t o = 0;
+    const char* c = from;
+    while (*c != '\0' && *c != '&' && *c != ' ' && *c != '\n' && *c != '\r' && *c != '\t')
+    {
+        char ch = *c;
+        if (ch == '+')
+            ch = ' ';
+        else if (ch == '%' && hex_digit(c[1]) >= 0 && hex_digit(c[2]) >= 0)
+        {
+            ch = (char)(hex_digit(c[1]) * 16 + hex_digit(c[2]));
+            c += 2;
+        }
+        if (out != NULL)
+        {
+            if (o + 1u >= size)
+                return false;
+            out[o] = ch;
+        }
+        o++;
+        c++;
+    }
+    if (out != NULL)
+        out[o] = '\0';
+    *end = c;
+    return true;
+}
+
+dmod_libmeshcore_api_declaration(1.0, int, _channel_link_parse, ( const char* text, char* name, size_t name_size, char* secret, size_t secret_size ))
+{
+    if (text == NULL || name == NULL || name_size == 0 || secret == NULL || secret_size == 0)
+        return -EINVAL;
+    const size_t prefix = sizeof(CHANNEL_LINK) - 1u;
+    const char* at = text;
+    while (*at != '\0' && strncmp(at, CHANNEL_LINK, prefix) != 0)      /* (no strstr in a module) */
+        at++;
+    if (*at == '\0')
+        return -ENOENT;
+    at += prefix;
+    name[0] = secret[0] = '\0';
+    while (*at != '\0' && *at != ' ')
+    {
+        const char* equal = at;
+        while (*equal != '\0' && *equal != '=' && *equal != '&' && *equal != ' ')
+            equal++;
+        if (*equal != '=')
+            break;
+        char* target = NULL;
+        size_t target_size = 0;
+        if (equal - at == 4 && strncmp(at, "name", 4) == 0)
+            target = name, target_size = name_size;
+        else if (equal - at == 6 && strncmp(at, "secret", 6) == 0)
+            target = secret, target_size = secret_size;
+        const char* end = equal + 1;
+        if (!link_value(equal + 1, target, target_size, &end))      /* (a parameter that is not known has no target: it is skipped) */
+            return -ENOSPC;
+        at = (*end == '&') ? end + 1 : end;
+    }
+    return (name[0] != '\0' && secret[0] != '\0') ? 0 : -ENOENT;
+}

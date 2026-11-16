@@ -654,6 +654,27 @@ dmod_libmeshcore_api_declaration(1.0, int, _channel_remove, ( uint8_t index ))
     return ret;
 }
 
+dmod_libmeshcore_api_declaration(1.0, int, _channel_find, ( const char* secret, uint8_t* index ))
+{
+    libmeshcore_channel_t channel;
+    if (secret == NULL || index == NULL || g.lock == NULL || libmeshcore_channel_from_text(&channel, secret) != 0)
+        return -EINVAL;
+    int ret = -ENOENT;
+    dmosi_mutex_lock(g.lock);
+    ensure_channels_loaded_locked();
+    for (unsigned i = 0; i < LIBMESHCORE_MAX_CHANNELS; i++)
+    {
+        if (g.channels[i].used && memcmp(g.channels[i].channel.secret, channel.secret, sizeof(channel.secret)) == 0)
+        {
+            *index = (uint8_t)i;
+            ret = 0;
+            break;
+        }
+    }
+    dmosi_mutex_unlock(g.lock);
+    return ret;
+}
+
 dmod_libmeshcore_api_declaration(1.0, int, _channel_name, ( uint8_t index, char* name, size_t capacity, uint8_t* hash ))
 {
     if (name == NULL || capacity == 0 || g.lock == NULL)
