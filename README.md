@@ -1,40 +1,53 @@
 # dmmeshcore
 
-The **MeshCore** mesh protocol ([MeshCore](https://github.com/meshcore-dev/MeshCore)) for DMOD: the format of its packets, the adverts of the nodes, the
-group channels. The library does not touch the radio: a client reads frames from a LoRa node (`DMDRVI_IOCTL_LORA_RECV` of dmdrvi, e.g. the
-[dmsx126x](https://github.com/choco-technologies/dmsx126x) of the T-Deck Pro), gives them to it and sends what it builds.
+The **MeshCore** mesh ([MeshCore](https://github.com/meshcore-dev/MeshCore)) for DMOD. Three modules:
 
-## What is there
+| module | what |
+|--------|------|
+| **`libmeshcore`** (the root of the repo) | **everything but the screen**: the protocol (packets, adverts, group channels), the service that listens on the radio, what it heard (nodes, texts, a log), the settings of the radio (kept on the device). Applications are a view of it. |
+| `meshcore` (`apps/meshcore`) | the application of the launcher (it has an icon: phoneui lists it): the state, the nodes, the texts. Only a screen over libmeshcore. |
+| `mesh` (`tools/mesh`) | the command line: a thin shell over libmeshcore (`mesh nodes`, `mesh texts`, `mesh set preset=1`, `mesh send ...`). |
 
-| | |
-|---|---|
-| `dmmeshcore_packet_decode / _encode` | a frame <-> a packet: the route (flood, direct, with/without transport codes), the type, the version, the path (hashes of 1..3 bytes), the payload |
-| `dmmeshcore_advert_decode` | an advert: the public key, the time, the signature (not verified yet), the kind of the node, the place, the name |
-| `dmmeshcore_channel_init / _channel_from_text` | a group channel from its 16-byte secret (base64 as the apps show it, or 32 hex digits); its hash is the first byte of SHA-256 of the secret (the public channel, `izOH6cXN6mrJ5e26oRXNcg==`, is 0x11) |
-| `dmmeshcore_group_text_decode / _encode` | a group text: `[channel hash][2 bytes of HMAC-SHA256][AES-128-ECB(time, flags, text)]` through `dmcrypto` |
+LoRa settings are also in **Settings** (the page LoRa: the switch, the region, the power), like the Wi-Fi ones.
 
-Not there yet (the next steps): the identity of the node (ed25519: the signature of adverts, the shared secret of direct messages), the routing
-(the flood with the hashes of the repeaters, the table of the seen packets, the paths), the contacts, the delivery of the messages.
+## How it starts
 
-## The tool
-
-`meshcore [-d NODE] [-k KEY]... sniff [SECONDS]` listens on `/dev/lora` and says what comes:
+dmdevfs reports a radio (a node that answers `DMDRVI_IOCTL_LORA_GET_INFO`, e.g. `/dev/lora` of [dmsx126x](https://github.com/choco-technologies/dmsx126x)) to libsystemd
+as a device of the class `lora`. `configs/libmeshcore.rules` (`[class=lora] start=libmeshcore@%name`) makes libsystemd start the library service for it
+(`configs/libmeshcore@.ini`, `type=library`): nothing is started by hand. In the image:
 
 ```
--47 dBm snr 11  109 bytes  flood group-text v0  4 hops (2-byte hashes: 4c16 ee9f e15f 5ad8)  payload 99
-    channel #ca (no key)
--51 dBm snr 11  63 bytes  flood advert v0  2 hops (...)  payload 118
-    repeater "Hill"  key 3fa1c0de..  time 1763200000  at 50.123456, 19.654321
+libmeshcore service=libmeshcore@.ini
+libmeshcore rules=libmeshcore.rules
+mesh
+meshcore @screen epaper-240x320
 ```
 
-The group texts are decrypted for the channels it has the key of (`-k`; the public channel is always tried).
+The service keeps a thread on the radio: it takes every frame apart, remembers the nodes (adverts, 16), the texts of the channels it has the key of (12) and a log of the
+packets (16). `libmeshcore_wait()` tells an application when something changed, so a screen does not poll.
+
+## libmeshcore
+
+```c
+libmeshcore_status(&status);                   // running, listening, packets, adverts, texts ...
+libmeshcore_contacts(c, n, &count);            // the nodes heard, the newest first
+libmeshcore_messages(m, n, &count);            // the texts of the channels
+libmeshcore_settings_get(&s); libmeshcore_settings_set(&s);   // preset, power, name ...: checked, kept in /ext/meshcore.ini, applied to the radio
+libmeshcore_channel_add("Friends", "base64 or 32 hex digits");
+libmeshcore_send_text(channel, "hello");       // a flood to a channel (after a look at the channel: CAD)
+libmeshcore_packet_decode / _encode, _advert_decode, _group_text_decode / _encode   // the protocol, without a radio
+```
+
+The presets: EU/UK narrow (869.618 MHz, 62.5 kHz, SF8, 4/8 - the one the mesh around the T-Deck Pro uses), EU/UK long range, USA/Canada, custom (`mesh set frequency=... sf=...`).
+
+Not there yet: the identity of the node (ed25519: signed adverts, direct messages), the routing (repeating, the table of seen packets, paths), saving the keys of channels
+in dmsecrets (now they are kept until the restart), and checking the signature of an advert.
 
 ## Build and test
 
 ```sh
 cmake -S . -B build -DDMOD_TOOLS_NAME=arch/x86_64
 cmake --build build --parallel
-ctest --test-dir build --output-on-failure
 ```
 
-The test frames are frames heard on 869.618 MHz with a T-Deck Pro. [MIT license](LICENSE)
+The tests are modules (`test_libmeshcore`, `test_meshcore`) run with `dmod_loader` (see `.github/workflows/ci.yml`). The test frames are frames heard on 869.618 MHz with a T-Deck Pro. [MIT license](LICENSE)

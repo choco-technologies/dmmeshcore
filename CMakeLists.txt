@@ -37,8 +37,8 @@ if(NOT _dmod_installed_sdk)
     FetchContent_MakeAvailable(dmod)
 endif()
 
-project(dmmeshcore VERSION ${DMOD_MODULE_VERSION}
-    DESCRIPTION "dmmeshcore DMOD library module"
+project(libmeshcore VERSION ${DMOD_MODULE_VERSION}
+    DESCRIPTION "libmeshcore DMOD library module"
     LANGUAGES C CXX)
 
 if(NOT _dmod_installed_sdk)
@@ -49,22 +49,22 @@ if(NOT _dmod_installed_sdk)
 endif()
 
 # Name of the module
-set(DMOD_MODULE_NAME        dmmeshcore)
+set(DMOD_MODULE_NAME        libmeshcore)
 
 # Author (should be string)
 set(DMOD_AUTHOR_NAME        "Patryk Kubiak")
 
 # Stack size for the module (should be integer)
-set(DMOD_STACK_SIZE         1024)
+set(DMOD_STACK_SIZE         6144)
 
 # Path to the .dmr file - enables release package creation in build/packages/
-set(DMOD_DMR_PATH           ${CMAKE_CURRENT_SOURCE_DIR}/dmmeshcore.dmr)
+set(DMOD_DMR_PATH           ${CMAKE_CURRENT_SOURCE_DIR}/libmeshcore.dmr)
 
 # List of MAL interfaces implemented by this module (leave empty if none)
 set(DMOD_MAL_IMPLS          )
 
 # List of DIF interfaces implemented by this module (leave empty if none)
-set(DMOD_DIF_IMPLS          )
+set(DMOD_DIF_IMPLS          libsystemd)
 
 #
 #   dmod_add_library - create a library module
@@ -76,6 +76,8 @@ dmod_add_library(${DMOD_MODULE_NAME} ${DMOD_MODULE_VERSION}
     # List of source files - can include C and C++ files
     src/packet.c
     src/group.c
+    src/settings.c
+    src/service.c
 )
 
 target_include_directories(${DMOD_MODULE_NAME} PRIVATE
@@ -86,10 +88,18 @@ target_include_directories(${DMOD_MODULE_NAME}_if INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-# dmcrypto: the hash, the HMAC and AES of the group channels. No versions: the latest is taken.
+# dmdrvi: the LoRa interface (the node of the radio), libsystemd: the library service (the radio is started by a rule), dmosi: the lock and the thread,
+# dmini: the settings file, dmcrypto: the hash, the HMAC and AES of the channels, dmutc: the time of a text.
 dmod_link_modules(${DMOD_MODULE_NAME}
+    dmdrvi@>=2.17
+    libsystemd
+    dmosi
+    dmini
     dmcrypto
+    dmutc
 )
+
 enable_testing()
 add_subdirectory(tests)
-add_subdirectory(tools/meshcore)
+add_subdirectory(tools/mesh)
+add_subdirectory(apps/meshcore)

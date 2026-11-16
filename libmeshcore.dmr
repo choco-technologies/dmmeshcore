@@ -1,4 +1,4 @@
-# DMOD Resource File for dmmeshcore
+# DMOD Resource File for libmeshcore
 # This file specifies where resources should be installed
 
 # === Core Module ===
@@ -20,6 +20,9 @@ docs=./docs => ${destination}/${module}/docs [origin=${repo_dir}/docs]
 
 # README file
 readme=./README.md => ${destination}/${module}/README.md [origin=${repo_dir}/README.md]
+
+# === The rule and the unit of the service (libsystemd: a LoRa radio starts libmeshcore) ===
+configs=./configs => ${destination}/${module}/configs [origin=${repo_dir}/configs]
 
 # === Header Files ===
 # Include directory with all headers (public header + generated <module>_defs.h)

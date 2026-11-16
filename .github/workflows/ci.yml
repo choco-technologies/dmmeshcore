@@ -19,7 +19,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build dmmeshcore
+      - name: Build libmeshcore
         run: |
           mkdir -p build
           cd build
@@ -30,13 +30,13 @@ jobs:
         run: |
           echo "Checking for module files..."
           ls -lh build/dmf/
-          test -f build/dmf/dmmeshcore.dmf
-          test -f build/dmf/dmmeshcore_version.txt
-          test -f build/dmf/test_dmmeshcore.dmf
+          test -f build/dmf/libmeshcore.dmf
+          test -f build/dmf/libmeshcore_version.txt
+          test -f build/dmf/test_libmeshcore.dmf
           echo "Module files present"
 
       - name: Run tests with dmod_loader
         run: |
           export DMOD_DMF_DIR=$(pwd)/build/dmf
-          dmf-get install -d ${DMOD_DMF_DIR}/test_dmmeshcore-local.dmd -y
-          dmod_loader build/dmf/test_dmmeshcore.dmf
+          dmf-get install -d ${DMOD_DMF_DIR}/test_libmeshcore-local.dmd -y
+          dmod_loader build/dmf/test_libmeshcore.dmf

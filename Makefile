@@ -15,7 +15,7 @@ include $(DMOD_DIR)/paths.mk
 # -----------------------------------------------------------------------------
 
 # The name of the module
-DMOD_MODULE_NAME=dmmeshcore
+DMOD_MODULE_NAME=libmeshcore
 
 # The version of the module
 DMOD_MODULE_VERSION=0.1
@@ -24,13 +24,13 @@ DMOD_MODULE_VERSION=0.1
 DMOD_AUTHOR_NAME=Patryk Kubiak
 
 # The list of C sources
-DMOD_CSOURCES=src/packet.c src/group.c
+DMOD_CSOURCES=src/packet.c src/group.c src/settings.c src/service.c
 
 # The list of C++ sources
 DMOD_CXXSOURCES=
 
 # The list of include directories
-DMOD_INC_DIRS=include
+DMOD_INC_DIRS=include src
 
 # The list of libraries to link
 DMOD_LIBS=
@@ -46,7 +46,7 @@ DMOD_MAL_IMPLS=
 # -----------------------------------------------------------------------------
 #   List of DIF interfaces implemented by the module
 # -----------------------------------------------------------------------------
-DMOD_DIF_IMPLS=
+DMOD_DIF_IMPLS=libsystemd
 
 # -----------------------------------------------------------------------------
 #   Include the dmod app makefile

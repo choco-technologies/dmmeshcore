@@ -1,6 +1,8 @@
 #define DMOD_ENABLE_REGISTRATION ON
 #include "dmod.h"
-#include "dmmeshcore.h"
+#include "libmeshcore.h"
+#include "internal.h"
+#include "libsystemd_service.h"
 #include <errno.h>
 #include <string.h>
 
@@ -19,15 +21,15 @@
 
 static bool route_has_transport(uint8_t route)
 {
-    return route == DMMESHCORE_ROUTE_TRANSPORT_FLOOD || route == DMMESHCORE_ROUTE_TRANSPORT_DIRECT;
+    return route == LIBMESHCORE_ROUTE_TRANSPORT_FLOOD || route == LIBMESHCORE_ROUTE_TRANSPORT_DIRECT;
 }
 
-dmod_dmmeshcore_api_declaration(1.0, int, _packet_decode, ( const uint8_t* frame, size_t size, dmmeshcore_packet_t* packet ))
+dmod_libmeshcore_api_declaration(1.0, int, _packet_decode, ( const uint8_t* frame, size_t size, libmeshcore_packet_t* packet ))
 {
     if (frame == NULL || packet == NULL)
         return -EINVAL;
     memset(packet, 0, sizeof(*packet));
-    if (size < 2u || size > DMMESHCORE_MAX_FRAME)
+    if (size < 2u || size > LIBMESHCORE_MAX_FRAME)
         return -EINVAL;
     size_t at = 0;
     uint8_t header = frame[at++];
@@ -48,30 +50,30 @@ dmod_dmmeshcore_api_declaration(1.0, int, _packet_decode, ( const uint8_t* frame
     if (packet->hash_size > 3u)
         return -EINVAL;                                 /* (the code 3 is reserved) */
     size_t path_bytes = (size_t)packet->hash_count * packet->hash_size;
-    if (path_bytes > DMMESHCORE_MAX_PATH || size < at + path_bytes)
+    if (path_bytes > LIBMESHCORE_MAX_PATH || size < at + path_bytes)
         return -EINVAL;
     memcpy(packet->path, frame + at, path_bytes);
     at += path_bytes;
     size_t payload = size - at;
-    if (payload > DMMESHCORE_MAX_PAYLOAD)
+    if (payload > LIBMESHCORE_MAX_PAYLOAD)
         return -EMSGSIZE;
     memcpy(packet->payload, frame + at, payload);
     packet->payload_length = (uint8_t)payload;
     return 0;
 }
 
-dmod_dmmeshcore_api_declaration(1.0, int, _packet_encode, ( const dmmeshcore_packet_t* packet, uint8_t* frame, size_t capacity, size_t* size ))
+dmod_libmeshcore_api_declaration(1.0, int, _packet_encode, ( const libmeshcore_packet_t* packet, uint8_t* frame, size_t capacity, size_t* size ))
 {
     if (packet == NULL || frame == NULL || size == NULL)
         return -EINVAL;
     if (packet->route > 3u || packet->type > HEADER_TYPE_MASK || packet->version > 3u || packet->hash_size < 1u || packet->hash_size > 3u ||
-        packet->hash_count > PATH_COUNT_MASK || packet->payload_length > DMMESHCORE_MAX_PAYLOAD)
+        packet->hash_count > PATH_COUNT_MASK || packet->payload_length > LIBMESHCORE_MAX_PAYLOAD)
         return -EINVAL;
     size_t path_bytes = (size_t)packet->hash_count * packet->hash_size;
-    if (path_bytes > DMMESHCORE_MAX_PATH)
+    if (path_bytes > LIBMESHCORE_MAX_PATH)
         return -EINVAL;
     size_t length = 2u + (route_has_transport(packet->route) ? 4u : 0u) + path_bytes + packet->payload_length;
-    if (length > capacity || length > DMMESHCORE_MAX_FRAME)
+    if (length > capacity || length > LIBMESHCORE_MAX_FRAME)
         return -ENOSPC;
     size_t at = 0;
     frame[at++] = (uint8_t)(packet->route | (packet->type << HEADER_TYPE_SHIFT) | (packet->version << HEADER_VERSION_SHIFT));
@@ -91,47 +93,47 @@ dmod_dmmeshcore_api_declaration(1.0, int, _packet_encode, ( const dmmeshcore_pac
     return 0;
 }
 
-dmod_dmmeshcore_api_declaration(1.0, const char*, _route_name, ( uint8_t route ))
+dmod_libmeshcore_api_declaration(1.0, const char*, _route_name, ( uint8_t route ))
 {
     switch (route)
     {
-        case DMMESHCORE_ROUTE_TRANSPORT_FLOOD:  return "transport-flood";
-        case DMMESHCORE_ROUTE_FLOOD:            return "flood";
-        case DMMESHCORE_ROUTE_DIRECT:           return "direct";
-        case DMMESHCORE_ROUTE_TRANSPORT_DIRECT: return "transport-direct";
+        case LIBMESHCORE_ROUTE_TRANSPORT_FLOOD:  return "transport-flood";
+        case LIBMESHCORE_ROUTE_FLOOD:            return "flood";
+        case LIBMESHCORE_ROUTE_DIRECT:           return "direct";
+        case LIBMESHCORE_ROUTE_TRANSPORT_DIRECT: return "transport-direct";
         default:                                return "?";
     }
 }
 
-dmod_dmmeshcore_api_declaration(1.0, const char*, _type_name, ( uint8_t type ))
+dmod_libmeshcore_api_declaration(1.0, const char*, _type_name, ( uint8_t type ))
 {
     switch (type)
     {
-        case DMMESHCORE_TYPE_REQ:        return "req";
-        case DMMESHCORE_TYPE_RESPONSE:   return "response";
-        case DMMESHCORE_TYPE_TXT_MSG:    return "text";
-        case DMMESHCORE_TYPE_ACK:        return "ack";
-        case DMMESHCORE_TYPE_ADVERT:     return "advert";
-        case DMMESHCORE_TYPE_GRP_TXT:    return "group-text";
-        case DMMESHCORE_TYPE_GRP_DATA:   return "group-data";
-        case DMMESHCORE_TYPE_ANON_REQ:   return "anon-req";
-        case DMMESHCORE_TYPE_PATH:       return "path";
-        case DMMESHCORE_TYPE_TRACE:      return "trace";
-        case DMMESHCORE_TYPE_MULTIPART:  return "multipart";
-        case DMMESHCORE_TYPE_CONTROL:    return "control";
-        case DMMESHCORE_TYPE_RAW_CUSTOM: return "raw";
+        case LIBMESHCORE_TYPE_REQ:        return "req";
+        case LIBMESHCORE_TYPE_RESPONSE:   return "response";
+        case LIBMESHCORE_TYPE_TXT_MSG:    return "text";
+        case LIBMESHCORE_TYPE_ACK:        return "ack";
+        case LIBMESHCORE_TYPE_ADVERT:     return "advert";
+        case LIBMESHCORE_TYPE_GRP_TXT:    return "group-text";
+        case LIBMESHCORE_TYPE_GRP_DATA:   return "group-data";
+        case LIBMESHCORE_TYPE_ANON_REQ:   return "anon-req";
+        case LIBMESHCORE_TYPE_PATH:       return "path";
+        case LIBMESHCORE_TYPE_TRACE:      return "trace";
+        case LIBMESHCORE_TYPE_MULTIPART:  return "multipart";
+        case LIBMESHCORE_TYPE_CONTROL:    return "control";
+        case LIBMESHCORE_TYPE_RAW_CUSTOM: return "raw";
         default:                         return "?";
     }
 }
 
-dmod_dmmeshcore_api_declaration(1.0, const char*, _node_type_name, ( uint8_t node_type ))
+dmod_libmeshcore_api_declaration(1.0, const char*, _node_type_name, ( uint8_t node_type ))
 {
     switch (node_type)
     {
-        case DMMESHCORE_NODE_CHAT:      return "companion";
-        case DMMESHCORE_NODE_REPEATER:  return "repeater";
-        case DMMESHCORE_NODE_ROOM:      return "room";
-        case DMMESHCORE_NODE_SENSOR:    return "sensor";
+        case LIBMESHCORE_NODE_CHAT:      return "companion";
+        case LIBMESHCORE_NODE_REPEATER:  return "repeater";
+        case LIBMESHCORE_NODE_ROOM:      return "room";
+        case LIBMESHCORE_NODE_SENSOR:    return "sensor";
         default:                        return "?";
     }
 }
@@ -141,18 +143,18 @@ static int32_t read_i32(const uint8_t* p)
     return (int32_t)((uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24));
 }
 
-dmod_dmmeshcore_api_declaration(1.0, int, _advert_decode, ( const dmmeshcore_packet_t* packet, dmmeshcore_advert_t* advert ))
+dmod_libmeshcore_api_declaration(1.0, int, _advert_decode, ( const libmeshcore_packet_t* packet, libmeshcore_advert_t* advert ))
 {
-    if (packet == NULL || advert == NULL || packet->type != DMMESHCORE_TYPE_ADVERT)
+    if (packet == NULL || advert == NULL || packet->type != LIBMESHCORE_TYPE_ADVERT)
         return -EINVAL;
     memset(advert, 0, sizeof(*advert));
-    const size_t fixed = DMMESHCORE_PUBLIC_KEY_SIZE + 4u + DMMESHCORE_SIGNATURE_SIZE;
+    const size_t fixed = LIBMESHCORE_PUBLIC_KEY_SIZE + 4u + LIBMESHCORE_SIGNATURE_SIZE;
     if (packet->payload_length < fixed)
         return -EINVAL;
     const uint8_t* p = packet->payload;
-    memcpy(advert->public_key, p, DMMESHCORE_PUBLIC_KEY_SIZE);
-    advert->timestamp = (uint32_t)read_i32(p + DMMESHCORE_PUBLIC_KEY_SIZE);
-    memcpy(advert->signature, p + DMMESHCORE_PUBLIC_KEY_SIZE + 4u, DMMESHCORE_SIGNATURE_SIZE);
+    memcpy(advert->public_key, p, LIBMESHCORE_PUBLIC_KEY_SIZE);
+    advert->timestamp = (uint32_t)read_i32(p + LIBMESHCORE_PUBLIC_KEY_SIZE);
+    memcpy(advert->signature, p + LIBMESHCORE_PUBLIC_KEY_SIZE + 4u, LIBMESHCORE_SIGNATURE_SIZE);
     size_t at = fixed;
     if (at == packet->payload_length)
         return 0;                                       /* an advert with no app data: only who it is */
@@ -176,7 +178,7 @@ dmod_dmmeshcore_api_declaration(1.0, int, _advert_decode, ( const dmmeshcore_pac
     if ((flags & ADVERT_NAME) != 0)
     {
         size_t name = packet->payload_length - at;
-        if (name > DMMESHCORE_NAME_MAX)
+        if (name > LIBMESHCORE_NAME_MAX)
             return -EINVAL;
         memcpy(advert->name, p + at, name);
         advert->name[name] = '\0';
@@ -184,13 +186,14 @@ dmod_dmmeshcore_api_declaration(1.0, int, _advert_decode, ( const dmmeshcore_pac
     return 0;
 }
 
-int dmod_init( const Dmod_Config_t* Config )
+/* The library service of libsystemd: [class=lora] start=libmeshcore@%name (configs/libmeshcore.rules) - the service of the radio of the unit. The registration of a
+ * DIF is made where it is defined and only one file of a module has the registrations: this is the one. */
+dmod_libsystemd_dif_api_declaration(1.0, libmeshcore, int, _service_start, ( const char* unit, int argc, const char* const argv[] ))
 {
-    (void)Config;
-    return 0;
+    return libmeshcore_service_begin(unit, argc, argv);
 }
 
-int dmod_deinit( void )
+dmod_libsystemd_dif_api_declaration(1.0, libmeshcore, int, _service_stop, ( const char* unit ))
 {
-    return 0;
+    return libmeshcore_service_end(unit);
 }

@@ -1,6 +1,6 @@
 {
     "files.associations": {
-        "dmmeshcore.h": "c"
+        "libmeshcore.h": "c"
     },
     "C_Cpp.default.compileCommands": "${workspaceFolder}/build/compile_commands.json",
     "C_Cpp.intelliSenseEngine": "default",

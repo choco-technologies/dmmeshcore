@@ -1,6 +1,6 @@
 /* (the registrations of the API are in packet.c: only one file of a module has DMOD_ENABLE_REGISTRATION) */
 #include "dmod.h"
-#include "dmmeshcore.h"
+#include "libmeshcore.h"
 #include "dmcrypto.h"
 #include <errno.h>
 #include <string.h>
@@ -14,28 +14,28 @@
 static int aes_block(bool encrypt, const uint8_t* key, const uint8_t* in, uint8_t* out)
 {
     uint8_t iv[AES_BLOCK] = { 0 };
-    return dmcrypto_cipher_crypt(DMCRYPTO_CIPHER_AES_CBC, encrypt, key, DMMESHCORE_CHANNEL_KEY_SIZE, iv, in, out, AES_BLOCK) == DMCRYPTO_OK ? 0 : -EIO;
+    return dmcrypto_cipher_crypt(DMCRYPTO_CIPHER_AES_CBC, encrypt, key, LIBMESHCORE_CHANNEL_KEY_SIZE, iv, in, out, AES_BLOCK) == DMCRYPTO_OK ? 0 : -EIO;
 }
 
-static int mac_of(const uint8_t* secret, const uint8_t* data, size_t size, uint8_t mac[DMMESHCORE_MAC_SIZE])
+static int mac_of(const uint8_t* secret, const uint8_t* data, size_t size, uint8_t mac[LIBMESHCORE_MAC_SIZE])
 {
     uint8_t full[32];
     size_t length = 0;
     /* (MeshCore keys the HMAC with the secret padded with zeros to 32 bytes: the same as the 16 bytes, HMAC pads the key itself) */
-    if (dmcrypto_hmac(DMCRYPTO_HASH_SHA256, secret, DMMESHCORE_CHANNEL_KEY_SIZE, data, size, full, sizeof(full), &length) != DMCRYPTO_OK || length < sizeof(full))
+    if (dmcrypto_hmac(DMCRYPTO_HASH_SHA256, secret, LIBMESHCORE_CHANNEL_KEY_SIZE, data, size, full, sizeof(full), &length) != DMCRYPTO_OK || length < sizeof(full))
         return -EIO;
-    memcpy(mac, full, DMMESHCORE_MAC_SIZE);
+    memcpy(mac, full, LIBMESHCORE_MAC_SIZE);
     return 0;
 }
 
-dmod_dmmeshcore_api_declaration(1.0, int, _channel_init, ( dmmeshcore_channel_t* channel, const uint8_t* secret ))
+dmod_libmeshcore_api_declaration(1.0, int, _channel_init, ( libmeshcore_channel_t* channel, const uint8_t* secret ))
 {
     if (channel == NULL || secret == NULL)
         return -EINVAL;
     uint8_t digest[32];
     size_t length = 0;
-    memcpy(channel->secret, secret, DMMESHCORE_CHANNEL_KEY_SIZE);
-    if (dmcrypto_hash(DMCRYPTO_HASH_SHA256, secret, DMMESHCORE_CHANNEL_KEY_SIZE, digest, sizeof(digest), &length) != DMCRYPTO_OK || length < 1u)
+    memcpy(channel->secret, secret, LIBMESHCORE_CHANNEL_KEY_SIZE);
+    if (dmcrypto_hash(DMCRYPTO_HASH_SHA256, secret, LIBMESHCORE_CHANNEL_KEY_SIZE, digest, sizeof(digest), &length) != DMCRYPTO_OK || length < 1u)
         return -EIO;
     channel->hash = digest[0];
     return 0;
@@ -59,22 +59,22 @@ static int hex_value(char c)
     return -1;
 }
 
-dmod_dmmeshcore_api_declaration(1.0, int, _channel_from_text, ( dmmeshcore_channel_t* channel, const char* text ))
+dmod_libmeshcore_api_declaration(1.0, int, _channel_from_text, ( libmeshcore_channel_t* channel, const char* text ))
 {
     if (channel == NULL || text == NULL)
         return -EINVAL;
     size_t length = strlen(text);
-    uint8_t secret[DMMESHCORE_CHANNEL_KEY_SIZE];
-    if (length == 2u * DMMESHCORE_CHANNEL_KEY_SIZE)
+    uint8_t secret[LIBMESHCORE_CHANNEL_KEY_SIZE];
+    if (length == 2u * LIBMESHCORE_CHANNEL_KEY_SIZE)
     {
-        for (size_t i = 0; i < DMMESHCORE_CHANNEL_KEY_SIZE; i++)
+        for (size_t i = 0; i < LIBMESHCORE_CHANNEL_KEY_SIZE; i++)
         {
             int hi = hex_value(text[2u * i]), lo = hex_value(text[2u * i + 1u]);
             if (hi < 0 || lo < 0)
                 return -EINVAL;
             secret[i] = (uint8_t)(hi * 16 + lo);
         }
-        return dmmeshcore_channel_init(channel, secret);
+        return libmeshcore_channel_init(channel, secret);
     }
     /* base64 of 16 bytes: 22 characters, with "==" 24 */
     uint32_t bits = 0;
@@ -90,34 +90,34 @@ dmod_dmmeshcore_api_declaration(1.0, int, _channel_from_text, ( dmmeshcore_chann
         if (have >= 8u)
         {
             have -= 8u;
-            if (out >= DMMESHCORE_CHANNEL_KEY_SIZE)
+            if (out >= LIBMESHCORE_CHANNEL_KEY_SIZE)
                 return -EINVAL;
             secret[out++] = (uint8_t)(bits >> have);
         }
     }
-    if (out != DMMESHCORE_CHANNEL_KEY_SIZE)
+    if (out != LIBMESHCORE_CHANNEL_KEY_SIZE)
         return -EINVAL;
-    return dmmeshcore_channel_init(channel, secret);
+    return libmeshcore_channel_init(channel, secret);
 }
 
-dmod_dmmeshcore_api_declaration(1.0, int, _group_text_decode, ( const dmmeshcore_channel_t* channel, const dmmeshcore_packet_t* packet, dmmeshcore_group_text_t* text ))
+dmod_libmeshcore_api_declaration(1.0, int, _group_text_decode, ( const libmeshcore_channel_t* channel, const libmeshcore_packet_t* packet, libmeshcore_group_text_t* text ))
 {
-    if (channel == NULL || packet == NULL || text == NULL || packet->type != DMMESHCORE_TYPE_GRP_TXT)
+    if (channel == NULL || packet == NULL || text == NULL || packet->type != LIBMESHCORE_TYPE_GRP_TXT)
         return -EINVAL;
     memset(text, 0, sizeof(*text));
-    size_t cipher = packet->payload_length < 1u + DMMESHCORE_MAC_SIZE ? 0u : (size_t)packet->payload_length - 1u - DMMESHCORE_MAC_SIZE;
+    size_t cipher = packet->payload_length < 1u + LIBMESHCORE_MAC_SIZE ? 0u : (size_t)packet->payload_length - 1u - LIBMESHCORE_MAC_SIZE;
     if (cipher == 0u || cipher % AES_BLOCK != 0u)
         return -EINVAL;
     if (packet->payload[0] != channel->hash)
         return -ENOENT;
-    uint8_t mac[DMMESHCORE_MAC_SIZE];
-    const uint8_t* data = packet->payload + 1u + DMMESHCORE_MAC_SIZE;
+    uint8_t mac[LIBMESHCORE_MAC_SIZE];
+    const uint8_t* data = packet->payload + 1u + LIBMESHCORE_MAC_SIZE;
     int ret = mac_of(channel->secret, data, cipher, mac);
     if (ret != 0)
         return ret;
-    if (memcmp(mac, packet->payload + 1u, DMMESHCORE_MAC_SIZE) != 0)
+    if (memcmp(mac, packet->payload + 1u, LIBMESHCORE_MAC_SIZE) != 0)
         return -EBADMSG;
-    uint8_t plain[DMMESHCORE_MAX_PAYLOAD];
+    uint8_t plain[LIBMESHCORE_MAX_PAYLOAD];
     for (size_t at = 0; at < cipher; at += AES_BLOCK)
     {
         ret = aes_block(false, channel->secret, data + at, plain + at);
@@ -135,16 +135,16 @@ dmod_dmmeshcore_api_declaration(1.0, int, _group_text_decode, ( const dmmeshcore
     return 0;
 }
 
-dmod_dmmeshcore_api_declaration(1.0, int, _group_text_encode, ( const dmmeshcore_channel_t* channel, const dmmeshcore_group_text_t* text, dmmeshcore_packet_t* packet ))
+dmod_libmeshcore_api_declaration(1.0, int, _group_text_encode, ( const libmeshcore_channel_t* channel, const libmeshcore_group_text_t* text, libmeshcore_packet_t* packet ))
 {
     if (channel == NULL || text == NULL || packet == NULL)
         return -EINVAL;
     size_t text_length = strlen(text->text);
     size_t plain_length = 5u + text_length;
     size_t cipher = (plain_length + AES_BLOCK - 1u) / AES_BLOCK * AES_BLOCK;
-    if (1u + DMMESHCORE_MAC_SIZE + cipher > DMMESHCORE_MAX_PAYLOAD)
+    if (1u + LIBMESHCORE_MAC_SIZE + cipher > LIBMESHCORE_MAX_PAYLOAD)
         return -EINVAL;
-    uint8_t plain[DMMESHCORE_MAX_PAYLOAD];
+    uint8_t plain[LIBMESHCORE_MAX_PAYLOAD];
     memset(plain, 0, cipher);
     plain[0] = (uint8_t)text->timestamp;
     plain[1] = (uint8_t)(text->timestamp >> 8);
@@ -152,20 +152,20 @@ dmod_dmmeshcore_api_declaration(1.0, int, _group_text_encode, ( const dmmeshcore
     plain[3] = (uint8_t)(text->timestamp >> 24);
     plain[4] = (uint8_t)((text->text_type << 2) | (text->attempt & 0x03u));
     memcpy(plain + 5, text->text, text_length);
-    uint8_t* out = packet->payload + 1u + DMMESHCORE_MAC_SIZE;
+    uint8_t* out = packet->payload + 1u + LIBMESHCORE_MAC_SIZE;
     for (size_t at = 0; at < cipher; at += AES_BLOCK)
     {
         int ret = aes_block(true, channel->secret, plain + at, out + at);
         if (ret != 0)
             return ret;
     }
-    uint8_t mac[DMMESHCORE_MAC_SIZE];
+    uint8_t mac[LIBMESHCORE_MAC_SIZE];
     int ret = mac_of(channel->secret, out, cipher, mac);
     if (ret != 0)
         return ret;
-    packet->type = DMMESHCORE_TYPE_GRP_TXT;
+    packet->type = LIBMESHCORE_TYPE_GRP_TXT;
     packet->payload[0] = channel->hash;
-    memcpy(packet->payload + 1, mac, DMMESHCORE_MAC_SIZE);
-    packet->payload_length = (uint8_t)(1u + DMMESHCORE_MAC_SIZE + cipher);
+    memcpy(packet->payload + 1, mac, LIBMESHCORE_MAC_SIZE);
+    packet->payload_length = (uint8_t)(1u + LIBMESHCORE_MAC_SIZE + cipher);
     return 0;
 }

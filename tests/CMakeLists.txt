@@ -1,18 +1,18 @@
-set(DMOD_MODULE_NAME        test_dmmeshcore)
+set(DMOD_MODULE_NAME        test_libmeshcore)
 set(DMOD_MODULE_VERSION     ${PROJECT_VERSION})
 set(DMOD_AUTHOR_NAME        "Patryk Kubiak")
 set(DMOD_STACK_SIZE         8192)
 set(DMOD_PRIORITY           0)
 
 dmod_add_test(${DMOD_MODULE_NAME} ${DMOD_MODULE_VERSION}
-    dmmeshcore_test.c
+    libmeshcore_test.c
 )
 
 target_include_directories(${DMOD_MODULE_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../include
 )
 
-target_link_libraries(${DMOD_MODULE_NAME} dmmeshcore_if)
+target_link_libraries(${DMOD_MODULE_NAME} libmeshcore_if)
 
 # Register the test module with ctest - this replays the same two steps CI
 # runs (see .github/templates/ci.yml.template): install the test module's
@@ -28,5 +28,5 @@ if(DMF_GET_EXECUTABLE AND DMOD_LOADER_EXECUTABLE)
             bash -c "${DMF_GET_EXECUTABLE} install -d ${DMOD_DMF_DIR}/${DMOD_MODULE_NAME}-local.dmd -y && ${DMOD_LOADER_EXECUTABLE} ${DMOD_DMF_DIR}/${DMOD_MODULE_NAME}.dmf"
     )
 else()
-    message(WARNING "dmf-get/dmod_loader not found - 'ctest' will not run ${DMOD_MODULE_NAME}. Build the tools first with -DDMOD_BUILD_TOOLS=ON")
+    message(WARNING "dmf-get/dmod_loader not found - 'ctest' will not run ${DMOD_MODULE_NAME}. Build the tools first with -DDMOD_BUILD_TESTS=ON")
 endif()

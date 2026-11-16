@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- The same icon for a 1-bit e-paper: black and white only, no tile -->
+  <path d="M14 48 L32 14 L50 48 Z" fill="none" stroke="#000000" stroke-width="5" stroke-linejoin="round"/>
+  <circle cx="32" cy="14" r="9" fill="#000000"/>
+  <circle cx="14" cy="48" r="9" fill="#000000"/>
+  <circle cx="50" cy="48" r="9" fill="#000000"/>
+</svg>

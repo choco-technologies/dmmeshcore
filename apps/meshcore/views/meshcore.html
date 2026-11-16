@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MeshCore</title>
+<link rel="stylesheet" href="fonts/inter.css">
+<style>
+/*
+ * MeshCore for the part of the screen that an application is given on a phone with an e-paper (240 x 275, in the rent of the launcher):
+ * black and white only, lines of 2 px, text of 12 px at least and never thinner than the weight 600. Like the page of Settings.
+ */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 240px; height: 275px; background: #fff; color: #000; font-family: 'Inter'; font-weight: 600; overflow: hidden; }
+body { font-size: 14px; line-height: 1.2; }
+#screen { position: relative; width: 240px; height: 275px; background: #fff; overflow: hidden; }
+.page { position: absolute; left: 0; top: 0; width: 240px; height: 275px; background: #fff; opacity: 0; pointer-events: none; }
+.page.active { opacity: 1; pointer-events: auto; z-index: 5; }
+.hidden { opacity: 0; pointer-events: none; }
+.nowrap { white-space: nowrap; overflow: hidden; }
+.rule { position: absolute; left: 0; width: 240px; height: 2px; background: #000; }
+.hdr { position: absolute; left: 0; top: 0; width: 240px; height: 32px; }
+.hdr .back { position: absolute; left: 0; top: 0; width: 44px; height: 30px; font-size: 22px; font-weight: 700; text-align: center; line-height: 28px; }
+.hdr .name { position: absolute; left: 44px; top: 5px; width: 152px; text-align: center; font-size: 18px; font-weight: 700; }
+.hdr .rule { top: 30px; }
+.btn { position: absolute; border: 2px solid #000; border-radius: 8px; text-align: center; font-size: 16px; font-weight: 700; background: #fff; }
+.btn:active { background: #000; color: #fff; }
+.row { position: absolute; left: 0; width: 240px; background: #fff; }
+.row:active { background: #000; color: #fff; }
+
+/* the main page */
+#st-title { position: absolute; left: 12px; top: 40px; width: 216px; font-size: 18px; font-weight: 700; }
+#st-line1 { position: absolute; left: 12px; top: 68px; width: 216px; font-size: 13px; }
+#st-line2 { position: absolute; left: 12px; top: 88px; width: 216px; font-size: 13px; }
+#st-line3 { position: absolute; left: 12px; top: 108px; width: 216px; font-size: 13px; }
+#open-nodes { left: 12px; top: 150px; width: 216px; height: 40px; line-height: 36px; }
+#open-texts { left: 12px; top: 200px; width: 216px; height: 40px; line-height: 36px; }
+
+/* the lists */
+.item { height: 40px; }
+.item .nm { position: absolute; left: 12px; top: 3px; width: 216px; font-size: 16px; font-weight: 700; }
+.item .sub { position: absolute; left: 12px; top: 22px; width: 216px; font-size: 12px; }
+#n0 { top:36px; } #n1 { top:76px; } #n2 { top:116px; } #n3 { top:156px; } #n4 { top:196px; } 
+.msg { height: 48px; }
+.msg .who { position: absolute; left: 12px; top: 1px; width: 216px; font-size: 12px; font-weight: 700; }
+.msg .l1 { position: absolute; left: 12px; top: 15px; width: 216px; font-size: 13px; }
+.msg .l2 { position: absolute; left: 12px; top: 30px; width: 216px; font-size: 13px; }
+#t0 { top:36px; } #t1 { top:84px; } #t2 { top:132px; } #t3 { top:180px; } 
+.info { position: absolute; left: 60px; top: 248px; width: 120px; text-align: center; font-size: 12px; }
+.pg { top: 242px; width: 52px; height: 28px; line-height: 24px; font-size: 16px; }
+#prev-n, #prev-t { left: 6px; } #next-n, #next-t { left: 182px; }
+</style>
+</head>
+<body>
+<div id="screen">
+
+<div class="page active" id="main">
+  <div class="hdr"><div class="name" style="left:0;width:240px">MeshCore</div><div class="rule"></div></div>
+  <div id="st-title" class="nowrap">Listening</div>
+  <div id="st-line1" class="nowrap">869.618 MHz, SF8</div>
+  <div id="st-line2" class="nowrap">12 packets, 3 nodes</div>
+  <div id="st-line3" class="nowrap">last -47 dBm</div>
+  <div class="btn" id="open-nodes">Nodes</div>
+  <div class="btn" id="open-texts">Messages</div>
+</div>
+
+<div class="page" id="nodes">
+  <div class="hdr"><div class="back" id="nodes-back">&lt;</div><div class="name">Nodes</div><div class="rule"></div></div>
+  <div class="row item" id="n0"><div class="nm nowrap" id="n0-name">Node</div><div class="sub nowrap" id="n0-sub">repeater, 2 hops</div></div>
+  <div class="row item" id="n1"><div class="nm nowrap" id="n1-name">Node</div><div class="sub nowrap" id="n1-sub">repeater, 2 hops</div></div>
+  <div class="row item" id="n2"><div class="nm nowrap" id="n2-name">Node</div><div class="sub nowrap" id="n2-sub">repeater, 2 hops</div></div>
+  <div class="row item" id="n3"><div class="nm nowrap" id="n3-name">Node</div><div class="sub nowrap" id="n3-sub">repeater, 2 hops</div></div>
+  <div class="row item" id="n4"><div class="nm nowrap" id="n4-name">Node</div><div class="sub nowrap" id="n4-sub">repeater, 2 hops</div></div>
+  <div class="btn pg" id="prev-n">&lt;</div><div class="info nowrap" id="nodes-info">1-5 of 9</div><div class="btn pg" id="next-n">&gt;</div>
+</div>
+
+<div class="page" id="texts">
+  <div class="hdr"><div class="back" id="texts-back">&lt;</div><div class="name">Messages</div><div class="rule"></div></div>
+  <div class="row msg" id="t0"><div class="who nowrap" id="t0-who">Public</div><div class="l1 nowrap" id="t0-l1">text</div><div class="l2 nowrap" id="t0-l2">text</div></div>
+  <div class="row msg" id="t1"><div class="who nowrap" id="t1-who">Public</div><div class="l1 nowrap" id="t1-l1">text</div><div class="l2 nowrap" id="t1-l2">text</div></div>
+  <div class="row msg" id="t2"><div class="who nowrap" id="t2-who">Public</div><div class="l1 nowrap" id="t2-l1">text</div><div class="l2 nowrap" id="t2-l2">text</div></div>
+  <div class="row msg" id="t3"><div class="who nowrap" id="t3-who">Public</div><div class="l1 nowrap" id="t3-l1">text</div><div class="l2 nowrap" id="t3-l2">text</div></div>
+  <div class="btn pg" id="prev-t">&lt;</div><div class="info nowrap" id="texts-info">1-4 of 7</div><div class="btn pg" id="next-t">&gt;</div>
+</div>
+
+</div>
+<script src="dmod.js"></script>
+<script>
+/*
+ * The behaviour of the page (compiled by todmvs: nothing of it is interpreted on the device). The page knows nothing of the mesh: what it shows
+ * comes from properties that the application sets (dmod.prop), what the user does goes to the application as events (dmod.emit) - src/main.c is on
+ * the other side. The names are the contract (docs/gui.md).
+ */
+const pages = [document.getElementById('main'), document.getElementById('nodes'), document.getElementById('texts')];
+function shown(el, on) { if (on) el.classList.remove('hidden'); else el.classList.add('hidden'); }
+
+/* Every character the application may send: the font of the view has only the characters of the page and of its scripts */
+const CHARS = ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[]_abcdefghijklmnopqrstuvwxyz{|}~·…ĄĆĘŁŃÓŚŹŻąćęłńóśźż';
+
+dmod.prop('page', 0);
+dmod.onchange('page', () => {
+    const k = dmod.get('page');
+    for (let i = 0; i < pages.length; i++) {
+        if (i === k) pages[i].classList.add('active'); else pages[i].classList.remove('active');
+    }
+});
+
+dmod.prop('st.title', 'Listening');
+dmod.prop('st.line1', '');
+dmod.prop('st.line2', '');
+dmod.prop('st.line3', '');
+const stTitle = document.getElementById('st-title'), stLine1 = document.getElementById('st-line1'), stLine2 = document.getElementById('st-line2'),
+      stLine3 = document.getElementById('st-line3');
+dmod.onchange('st.title', () => stTitle.innerText = dmod.get('st.title'));
+dmod.onchange('st.line1', () => stLine1.innerText = dmod.get('st.line1'));
+dmod.onchange('st.line2', () => stLine2.innerText = dmod.get('st.line2'));
+dmod.onchange('st.line3', () => stLine3.innerText = dmod.get('st.line3'));
+document.getElementById('open-nodes').addEventListener('click', () => dmod.emit('open.nodes'));
+document.getElementById('open-texts').addEventListener('click', () => dmod.emit('open.texts'));
+document.getElementById('nodes-back').addEventListener('click', () => dmod.emit('back'));
+document.getElementById('texts-back').addEventListener('click', () => dmod.emit('back'));
+document.getElementById('prev-n').addEventListener('click', () => dmod.emit('prev'));
+document.getElementById('next-n').addEventListener('click', () => dmod.emit('next'));
+document.getElementById('prev-t').addEventListener('click', () => dmod.emit('prev'));
+document.getElementById('next-t').addEventListener('click', () => dmod.emit('next'));
+
+for (let i = 0; i < 5; i++) {
+    dmod.prop('n' + i + '.on', 0);
+    dmod.prop('n' + i + '.name', 'Node');
+    dmod.prop('n' + i + '.sub', '');
+    const row = document.getElementById('n' + i), name = document.getElementById('n' + i + '-name'), sub = document.getElementById('n' + i + '-sub');
+    dmod.onchange('n' + i + '.name', () => name.innerText = dmod.get('n' + i + '.name'));
+    dmod.onchange('n' + i + '.sub', () => sub.innerText = dmod.get('n' + i + '.sub'));
+    dmod.onchange('n' + i + '.on', () => shown(row, dmod.get('n' + i + '.on')));
+}
+dmod.prop('nodes.info', '');
+const nodesInfo = document.getElementById('nodes-info');
+dmod.onchange('nodes.info', () => nodesInfo.innerText = dmod.get('nodes.info'));
+
+for (let i = 0; i < 4; i++) {
+    dmod.prop('t' + i + '.on', 0);
+    dmod.prop('t' + i + '.who', 'Public');
+    dmod.prop('t' + i + '.l1', '');
+    dmod.prop('t' + i + '.l2', '');
+    const row = document.getElementById('t' + i), who = document.getElementById('t' + i + '-who'), l1 = document.getElementById('t' + i + '-l1'),
+          l2 = document.getElementById('t' + i + '-l2');
+    dmod.onchange('t' + i + '.who', () => who.innerText = dmod.get('t' + i + '.who'));
+    dmod.onchange('t' + i + '.l1', () => l1.innerText = dmod.get('t' + i + '.l1'));
+    dmod.onchange('t' + i + '.l2', () => l2.innerText = dmod.get('t' + i + '.l2'));
+    dmod.onchange('t' + i + '.on', () => shown(row, dmod.get('t' + i + '.on')));
+}
+dmod.prop('texts.info', '');
+const textsInfo = document.getElementById('texts-info');
+dmod.onchange('texts.info', () => textsInfo.innerText = dmod.get('texts.info'));
+</script>
+</body>
+</html>
