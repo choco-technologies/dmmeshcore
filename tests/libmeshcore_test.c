@@ -1,6 +1,7 @@
 #define DMOD_ENABLE_REGISTRATION ON
 #include "dmod_test.h"
 #include "libmeshcore.h"
+#include "internal.h"
 #include <errno.h>
 #include <string.h>
 
@@ -290,4 +291,101 @@ DMOD_TEST_STEP(channels_are_added_once)
     DMOD_TEST_EXPECT_EQ(libmeshcore_channel_remove(2), 0);
     DMOD_TEST_EXPECT_EQ(libmeshcore_channel_remove(2), -ENOENT);
     DMOD_TEST_EXPECT_EQ(libmeshcore_channel_name(2, name, sizeof(name), &hash), -ENOENT);
+}
+
+/* ---- The history of the texts: the file that outlives a reboot ---- */
+
+#define HISTORY_PATH    "/tmp/meshcore-history-test.bin"
+
+static void make_record(libmeshcore_record_t* r, uint32_t n)
+{
+    memset(r, 0, sizeof(*r));
+    r->timestamp = 1000u + n;
+    r->heard_utc = 2000u + n;
+    r->rssi_dbm = (int16_t)(-90 + (int)n);
+    r->hops = (uint8_t)(n % 4u);
+    r->mine = (uint8_t)(n % 2u);
+    Dmod_SnPrintf(r->channel, sizeof(r->channel), "#test");
+    Dmod_SnPrintf(r->text, sizeof(r->text), "Marek: message %u", (unsigned)n);
+}
+
+DMOD_TEST_STEP(history_is_appended_and_read_back)
+{
+    libmeshcore_record_t r, back[8];
+    size_t count = 99, in_file = 99;
+    bool tidy = false;
+    DMOD_TEST_EXPECT_EQ(libmeshcore_history_write(HISTORY_PATH, NULL, 0), 0);        /* (a history of no texts) */
+    DMOD_TEST_EXPECT_EQ(libmeshcore_history_read(HISTORY_PATH, back, 8, &count, &in_file, &tidy), 0);
+    DMOD_TEST_EXPECT_EQ((int)count, 0);
+    for (uint32_t i = 0; i < 3; i++)
+    {
+        make_record(&r, i);
+        DMOD_TEST_EXPECT_EQ(libmeshcore_history_append(HISTORY_PATH, &r), 0);
+    }
+    DMOD_TEST_EXPECT_EQ(libmeshcore_history_read(HISTORY_PATH, back, 8, &count, &in_file, &tidy), 0);
+    DMOD_TEST_EXPECT_EQ((int)count, 3);
+    DMOD_TEST_EXPECT_EQ((int)in_file, 3);
+    DMOD_TEST_EXPECT_TRUE(tidy);
+    DMOD_TEST_EXPECT_EQ((int)back[2].timestamp, 1002);
+    DMOD_TEST_EXPECT_EQ((int)back[1].rssi_dbm, -89);
+    DMOD_TEST_EXPECT_EQ(back[1].mine, 1);
+    DMOD_TEST_EXPECT_TRUE(strcmp(back[0].text, "Marek: message 0") == 0);
+    DMOD_TEST_EXPECT_TRUE(strcmp(back[2].channel, "#test") == 0);
+}
+
+DMOD_TEST_STEP(history_keeps_the_last_records_in_order)
+{
+    libmeshcore_record_t r, back[4];
+    size_t count = 0, in_file = 0;
+    DMOD_TEST_EXPECT_EQ(libmeshcore_history_write(HISTORY_PATH, NULL, 0), 0);
+    for (uint32_t i = 0; i < 10; i++)
+    {
+        make_record(&r, i);
+        DMOD_TEST_EXPECT_EQ(libmeshcore_history_append(HISTORY_PATH, &r), 0);
+    }
+    DMOD_TEST_EXPECT_EQ(libmeshcore_history_read(HISTORY_PATH, back, 4, &count, &in_file, NULL), 0);
+    DMOD_TEST_EXPECT_EQ((int)count, 4);
+    DMOD_TEST_EXPECT_EQ((int)in_file, 10);
+    for (uint32_t i = 0; i < 4; i++)
+        DMOD_TEST_EXPECT_EQ((int)back[i].timestamp, (int)(1006u + i));        /* the oldest of the last four first */
+    /* and written anew from them, the file is the short one */
+    DMOD_TEST_EXPECT_EQ(libmeshcore_history_write(HISTORY_PATH, back, count), 0);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_history_read(HISTORY_PATH, back, 4, &count, &in_file, NULL), 0);
+    DMOD_TEST_EXPECT_EQ((int)in_file, 4);
+    DMOD_TEST_EXPECT_EQ((int)back[0].timestamp, 1006);
+}
+
+DMOD_TEST_STEP(history_with_a_cut_record_is_not_tidy)
+{
+    libmeshcore_record_t r, back[8];
+    size_t count = 0, in_file = 0;
+    bool tidy = true;
+    DMOD_TEST_EXPECT_EQ(libmeshcore_history_write(HISTORY_PATH, NULL, 0), 0);
+    make_record(&r, 1);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_history_append(HISTORY_PATH, &r), 0);
+    void* f = Dmod_FileOpen(HISTORY_PATH, "ab");                    /* the power went off in the middle of a record */
+    DMOD_TEST_EXPECT_NOT_NULL(f);
+    Dmod_FileWrite(&r, 20, 1, f);
+    Dmod_FileClose(f);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_history_read(HISTORY_PATH, back, 8, &count, &in_file, &tidy), 0);
+    DMOD_TEST_EXPECT_EQ((int)count, 1);
+    DMOD_TEST_EXPECT_FALSE(tidy);
+}
+
+DMOD_TEST_STEP(history_of_another_kind_is_not_read)
+{
+    libmeshcore_record_t back[2];
+    size_t count = 5;
+    DMOD_TEST_EXPECT_EQ(libmeshcore_history_read("/tmp/meshcore-no-such-history.bin", back, 2, &count, NULL, NULL), -ENOENT);
+    void* f = Dmod_FileOpen(HISTORY_PATH, "wb");                    /* some other file */
+    DMOD_TEST_EXPECT_NOT_NULL(f);
+    Dmod_FileWrite("this is not a history of the texts", 1, 34, f);
+    Dmod_FileClose(f);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_history_read(HISTORY_PATH, back, 2, &count, NULL, NULL), -ENOENT);
+    libmeshcore_record_t r;
+    make_record(&r, 7);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_history_append(HISTORY_PATH, &r), 0);   /* appending to it starts a history */
+    DMOD_TEST_EXPECT_EQ(libmeshcore_history_read(HISTORY_PATH, back, 2, &count, NULL, NULL), 0);
+    DMOD_TEST_EXPECT_EQ((int)count, 1);
+    DMOD_TEST_EXPECT_EQ(libmeshcore_history_read(NULL, back, 2, &count, NULL, NULL), -EINVAL);
 }
