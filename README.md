@@ -41,6 +41,13 @@ libmeshcore_packet_decode / _encode, _advert_decode, _group_text_decode / _encod
 
 The presets: EU/UK narrow (869.618 MHz, 62.5 kHz, SF8, 4/8 - the one the mesh around the T-Deck Pro uses), EU/UK long range, USA/Canada, custom (`mesh set frequency=... sf=...`).
 
+### The history of the texts
+
+The texts that are heard or sent are kept in `/ext/meshcore-messages.bin` (a header and records of a fixed size, the newest at the end), so a reboot or a
+crash does not take them away: the last 32 are read back when the service starts (or as soon as `/ext` is there) and the application shows them with
+their age. The file may hold 4 times that many before it is written anew from the memory (the flash is spared); a record cut short by a power loss is
+dropped. Delete the file to forget the history.
+
 ### Notifications
 
 A text of somebody else heard on a channel is a notification of the system, when there is the notification node of
