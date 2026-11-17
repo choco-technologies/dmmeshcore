@@ -9,7 +9,7 @@
 /**
  * @brief meshcore - the screen of the MeshCore mesh: the state of the radio, the nodes that were heard, the channels with their texts in bubbles.
  *
- * Usage: meshcore [--display NAME] [<view>]
+ * Usage: meshcore [--display NAME] [--open CHANNEL] [<view>]   (--open: the chat of a channel is the first page - what a tap on a notification of the system does)
  *
  * NAME is the display it takes, or the rent of one that its owner gave it (the launcher of phoneui passes it to every application it starts, so the
  * application is shown in a part of the screen); without it, the first display. The view is views/meshcore.html converted by dmod at build time.
@@ -377,6 +377,7 @@ static void show_chat(ui_t* ui)
 {
     char name[24], title[LIBMESHCORE_CHANNEL_NAME_MAX + 1];
     size_t total = build_rows(ui);
+    (void)libmeshcore_channel_seen(ui->channel);            /* its texts are on the screen: the notification of the channel goes */
     size_t most = total > CHAT_ROWS ? total - CHAT_ROWS : 0u;
     if (ui->scroll > most)
         ui->scroll = most;
@@ -758,10 +759,17 @@ int main(int argc, char* argv[])
 {
     const char* display = NULL;
     const char* view = DEFAULT_VIEW;
+    int open_channel = -1;
     for (int i = 1; i < argc; i++)
     {
         if (strcmp(argv[i], "--display") == 0 && i + 1 < argc)
             display = argv[++i];
+        else if (strcmp(argv[i], "--open") == 0 && i + 1 < argc)
+        {
+            open_channel = 0;
+            for (const char* c = argv[++i]; *c >= '0' && *c <= '9' && open_channel < 255; c++)
+                open_channel = open_channel * 10 + (*c - '0');
+        }
         else if (argv[i][0] != '\0')
             view = argv[i];
     }
@@ -797,6 +805,10 @@ int main(int argc, char* argv[])
         Dmod_Free(ui.rows);
         return ret;
     }
+    char opened[LIBMESHCORE_CHANNEL_NAME_MAX + 1];
+    uint8_t opened_hash;
+    if (open_channel >= 0 && open_channel < LIBMESHCORE_MAX_CHANNELS && libmeshcore_channel_name((uint8_t)open_channel, opened, sizeof(opened), &opened_hash) == 0)
+        open_chat(&ui, (uint8_t)open_channel);                  /* (a channel that is gone: the first page stays) */
     show(&ui);
     libdmview_event_t ev;
     while ((ret = libdmview_wait_event(ui.claim, &ev, (int32_t)EVENT_WAIT_MS)) != -ENOENT)
