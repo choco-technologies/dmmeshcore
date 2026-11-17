@@ -76,6 +76,7 @@ dmod_add_library(${DMOD_MODULE_NAME} ${DMOD_MODULE_VERSION}
     # List of source files - can include C and C++ files
     src/packet.c
     src/group.c
+    src/history.c
     src/settings.c
     src/service.c
 )

@@ -56,6 +56,10 @@ static struct
     bool                    started;            /* a radio is served */
     bool                    channels_loaded;    /* the file of the channels was read (or written): until then it is not written over */
     uint32_t                channels_tried_ms;  /* when it was tried last (the file system may come up after the service) */
+    bool                    history_loaded;     /* the file of the texts was read: until then nothing is appended to it (the texts heard meanwhile are merged in) */
+    uint32_t                history_tried_ms;
+    size_t                  history_records;    /* what the file holds */
+    dmosi_mutex_t           history_lock;       /* one file operation at a time (taken before g.lock when both are needed, never after it) */
     char                    unit[48];
     char                    path[PATH_MAX_LENGTH + 1];
     char                    radio[24];
@@ -169,6 +173,152 @@ static uint32_t utc_now(void)
     return (dmutc_get(&utc) == 0 && utc.seconds > 0) ? (uint32_t)utc.seconds : 0u;
 }
 
+/* ---- The history of the texts (history.c): kept in a file, read back after a reboot ---- */
+
+static void record_of(const message_t* m, libmeshcore_record_t* r)
+{
+    memset(r, 0, sizeof(*r));
+    r->timestamp = m->info.timestamp;
+    r->heard_utc = m->info.heard_utc;
+    r->rssi_dbm = m->info.rssi_dbm;
+    r->hops = m->info.hops;
+    r->mine = m->info.mine ? 1u : 0u;
+    memcpy(r->channel, m->info.channel, sizeof(r->channel));
+    memcpy(r->text, m->info.text, sizeof(r->text));
+}
+
+/* The ring in order, the oldest first (g.lock is held); `records` has room for LIBMESHCORE_MAX_MESSAGES */
+static size_t records_of_ring_locked(libmeshcore_record_t* records)
+{
+    size_t n = g.message_count;
+    for (size_t i = 0; i < n; i++)
+    {
+        size_t at = (g.message_next + LIBMESHCORE_MAX_MESSAGES - n + i) % LIBMESHCORE_MAX_MESSAGES;
+        record_of(&g.messages[at], &records[i]);
+    }
+    return n;
+}
+
+/* A text of the file goes in the ring as the newest (g.lock is held): it was heard `age` ago, by the clock that is set now (when it was set then) */
+static void push_record_locked(const libmeshcore_record_t* r, uint32_t now_ms, uint32_t utc)
+{
+    message_t* m = &g.messages[g.message_next];
+    memset(m, 0, sizeof(*m));
+    m->info.timestamp = r->timestamp;
+    m->info.heard_utc = r->heard_utc;
+    m->info.rssi_dbm = r->rssi_dbm;
+    m->info.hops = r->hops;
+    m->info.mine = r->mine != 0u;
+    memcpy(m->info.channel, r->channel, sizeof(m->info.channel));
+    memcpy(m->info.text, r->text, sizeof(m->info.text));
+    uint32_t ago_s = (r->heard_utc != 0u && utc >= r->heard_utc) ? utc - r->heard_utc : 0u;
+    if (ago_s > 40u * 86400u)
+        ago_s = 40u * 86400u;                               /* (age_s counts milliseconds in 32 bits) */
+    m->heard_ms = now_ms - ago_s * 1000u;
+    g.message_next = (uint8_t)((g.message_next + 1U) % LIBMESHCORE_MAX_MESSAGES);
+    if (g.message_count < LIBMESHCORE_MAX_MESSAGES)
+        g.message_count++;
+}
+
+/* Read the file into the ring (g.lock is held; the texts that were heard before it could be read stay as the newest and are written to the file) */
+static void load_history_locked(void)
+{
+    libmeshcore_record_t* loaded = Dmod_Malloc(sizeof(*loaded) * LIBMESHCORE_MAX_MESSAGES * 2U);
+    if (loaded == NULL)
+        return;
+    libmeshcore_record_t* heard = loaded + LIBMESHCORE_MAX_MESSAGES;
+    size_t count = 0, in_file = 0;
+    bool tidy = true;
+    int ret = libmeshcore_history_read(LIBMESHCORE_HISTORY_FILE, loaded, LIBMESHCORE_MAX_MESSAGES, &count, &in_file, &tidy);
+    if (ret != 0 && ret != -ENOENT)
+    {
+        Dmod_Free(loaded);                                  /* the file system is not there yet: try again later */
+        return;
+    }
+    if (ret == -ENOENT)
+    {
+        /* no file: that is how it is until the first text - or /ext is not mounted yet. Only a directory that can be opened is the file system */
+        void* dir = Dmod_OpenDir("/ext");
+        if (dir == NULL)
+        {
+            Dmod_Free(loaded);
+            return;
+        }
+        Dmod_CloseDir(dir);
+    }
+    size_t meanwhile = records_of_ring_locked(heard);
+    uint32_t now_ms = Dmod_GetUptime(), utc = utc_now();
+    g.message_count = 0;
+    g.message_next = 0;
+    for (size_t i = 0; i < count; i++)
+        push_record_locked(&loaded[i], now_ms, utc);
+    for (size_t i = 0; i < meanwhile; i++)
+    {
+        /* a text heard meanwhile that the file has (it was written by a previous run, the sender's clock says so) is not added twice */
+        bool known = false;
+        for (size_t j = 0; j < count && !known; j++)
+            known = loaded[j].timestamp == heard[i].timestamp && strcmp(loaded[j].channel, heard[i].channel) == 0 && strcmp(loaded[j].text, heard[i].text) == 0;
+        if (!known)
+            push_record_locked(&heard[i], now_ms, utc);
+    }
+    g.history_records = in_file;
+    g.history_loaded = true;
+    if (meanwhile > 0u || !tidy)
+    {
+        size_t n = records_of_ring_locked(loaded);
+        if (libmeshcore_history_write(LIBMESHCORE_HISTORY_FILE, loaded, n) == 0)
+            g.history_records = n;
+        else
+            g.history_loaded = false;                       /* (it could not be written: it is tried again) */
+    }
+    changed();
+    Dmod_Free(loaded);
+}
+
+/* The service may start before /ext is there: it is tried every 2 s */
+static void ensure_history_loaded_locked(void)
+{
+    uint32_t now = Dmod_GetUptime();
+    if (g.history_loaded || (g.history_tried_ms != 0u && now - g.history_tried_ms < 2000u))
+        return;
+    g.history_tried_ms = now != 0u ? now : 1u;
+    load_history_locked();
+}
+
+/* A text that is new goes to the file (g.lock is NOT held). Before the file was read the text only waits in the ring: the load writes it */
+static void store_record(const libmeshcore_record_t* record)
+{
+    if (g.history_lock == NULL)
+        return;
+    dmosi_mutex_lock(g.history_lock);
+    dmosi_mutex_lock(g.lock);
+    bool loaded = g.history_loaded;
+    bool rewrite = loaded && g.history_records >= LIBMESHCORE_HISTORY_LIMIT;
+    libmeshcore_record_t* all = NULL;
+    size_t n = 0;
+    if (rewrite)
+    {
+        all = Dmod_Malloc(sizeof(*all) * LIBMESHCORE_MAX_MESSAGES);
+        if (all != NULL)
+            n = records_of_ring_locked(all);                /* (it has the new text already) */
+        else
+            rewrite = false;
+    }
+    dmosi_mutex_unlock(g.lock);
+    if (loaded)
+    {
+        int ret = rewrite ? libmeshcore_history_write(LIBMESHCORE_HISTORY_FILE, all, n) : libmeshcore_history_append(LIBMESHCORE_HISTORY_FILE, record);
+        if (ret == 0)
+        {
+            g.history_records = rewrite ? n : g.history_records + 1U;
+        }
+        else
+            DMOD_LOG_WARN("meshcore: cannot keep the text in %s (%d)\n", LIBMESHCORE_HISTORY_FILE, ret);
+    }
+    Dmod_Free(all);
+    dmosi_mutex_unlock(g.history_lock);
+}
+
 /* true when the text is new (a copy of one that is kept is not) */
 static bool note_message(const channel_slot_t* channel, const libmeshcore_group_text_t* text, const libmeshcore_packet_t* packet, int16_t rssi,
                          uint32_t now, bool mine)
@@ -266,6 +416,8 @@ static void take_frame(const dmdrvi_lora_frame_t* frame)
     libmeshcore_packet_t packet;
     uint32_t now = Dmod_GetUptime();
     int notify = -1;                                        /* the channel a new text of somebody else came on */
+    libmeshcore_record_t stored;
+    bool keep = false;
     dmosi_mutex_lock(g.lock);
     g.last_rssi = frame->rssi_dbm;
     if (libmeshcore_packet_decode(frame->data, frame->length, &packet) != 0)
@@ -298,6 +450,8 @@ static void take_frame(const dmdrvi_lora_frame_t* frame)
                     g.texts++;
                     notify = (int)(ch - g.channels);
                     notify_prepare_locked((unsigned)notify, text.text);
+                    record_of(&g.messages[(g.message_next + LIBMESHCORE_MAX_MESSAGES - 1U) % LIBMESHCORE_MAX_MESSAGES], &stored);
+                    keep = true;
                 }
                 break;
             }
@@ -307,6 +461,8 @@ static void take_frame(const dmdrvi_lora_frame_t* frame)
     dmosi_mutex_unlock(g.lock);
     if (notify >= 0)                                        /* (notify_brief and notify_text are written by this thread only) */
         notify_ioctl(DMNOTIFY_IOCTL_CMD_NOTIFY, g.notify_brief, g.notify_text, (uint8_t)notify);
+    if (keep)
+        store_record(&stored);
 }
 
 /* ---- The worker ---- */
@@ -323,7 +479,10 @@ static void worker_main(void* arg)
         dmosi_mutex_lock(g.lock);
         bool serving = g.started;
         if (serving)
+        {
             ensure_channels_loaded_locked();
+            ensure_history_loaded_locked();
+        }
         bool enabled = g.settings.enabled && serving;
         libmeshcore_settings_t settings = g.settings;
         char path[PATH_MAX_LENGTH + 1];
@@ -854,10 +1013,15 @@ dmod_libmeshcore_api_declaration(1.0, int, _send_text, ( uint8_t channel_index, 
     if (ret == 0)
     {
         dmosi_mutex_lock(g.lock);
-        note_message(&channel, &group, &packet, 0, Dmod_GetUptime(), true);
+        libmeshcore_record_t stored;
+        bool keep = note_message(&channel, &group, &packet, 0, Dmod_GetUptime(), true);
+        if (keep)
+            record_of(&g.messages[(g.message_next + LIBMESHCORE_MAX_MESSAGES - 1U) % LIBMESHCORE_MAX_MESSAGES], &stored);
         g.sent++;
         changed();
         dmosi_mutex_unlock(g.lock);
+        if (keep)
+            store_record(&stored);
     }
     return ret;
 }
@@ -877,12 +1041,16 @@ int dmod_init( const Dmod_Config_t* Config )
     (void)libmeshcore_channel_from_text(&g.channels[0].channel, "izOH6cXN6mrJ5e26oRXNcg==");
     g.channels[0].used = true;
     g.notify_lock = dmosi_mutex_create(false);              /* (without it there are no notifications, the rest works) */
+    g.history_lock = dmosi_mutex_create(false);
     g.worker = dmosi_thread_create(worker_main, NULL, 2, 6144, "meshcore", dmosi_process_current());
     if (g.worker == NULL)
     {
         if (g.notify_lock != NULL)
             dmosi_mutex_destroy(g.notify_lock);
         g.notify_lock = NULL;
+        if (g.history_lock != NULL)
+            dmosi_mutex_destroy(g.history_lock);
+        g.history_lock = NULL;
         dmosi_mutex_destroy(g.lock);
         g.lock = NULL;
         return -ENOMEM;
@@ -911,6 +1079,10 @@ int dmod_deinit( void )
     if (g.notify_lock != NULL)
         dmosi_mutex_destroy(g.notify_lock);
     g.notify_lock = NULL;
+    if (g.history_lock != NULL)
+        dmosi_mutex_destroy(g.history_lock);
+    g.history_lock = NULL;
+    g.history_loaded = false;
     dmosi_mutex_destroy(g.lock);
     g.lock = NULL;
     return 0;
